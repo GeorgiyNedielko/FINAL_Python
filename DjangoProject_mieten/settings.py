@@ -25,7 +25,7 @@ DATABASES = {
         "ENGINE": "django.db.backends.mysql",
         "NAME": os.getenv("MYSQL_DATABASE"),
         "USER": os.getenv("MYSQL_USER"),
-        "PASSWORD": os.getenv("MYSQL_PASSWORD"),  # <-- ВОТ ЭТО
+        "PASSWORD": os.getenv("MYSQL_PASSWORD"),
         "HOST": os.getenv("DB_HOST", "127.0.0.1"),
         "PORT": os.getenv("DB_PORT", "33066"),
         "OPTIONS": {"charset": "utf8mb4"},
@@ -33,7 +33,7 @@ DATABASES = {
 }
 
 
-AUTH_USER_MODEL = "users.User"
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -60,8 +60,11 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    "apps.users",
+    "apps.users.apps.UsersConfig",
+
 ]
+AUTH_USER_MODEL = "users.User"
+
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -97,12 +100,7 @@ WSGI_APPLICATION = 'DjangoProject_mieten.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
+
 
 
 # Password validation
