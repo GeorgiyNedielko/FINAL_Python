@@ -20,19 +20,29 @@ load_dotenv()
 
 #12/12 10.22
 
+# DATABASES = {
+#     "default": {
+#         "ENGINE": "django.db.backends.mysql",
+#         "NAME": os.getenv("MYSQL_DATABASE"),
+#         "USER": os.getenv("MYSQL_USER"),
+#         "PASSWORD": os.getenv("MYSQL_PASSWORD"),
+#         "HOST": os.getenv("DB_HOST", "127.0.0.1"),
+#         "PORT": os.getenv("DB_PORT", "33066"),
+#         "OPTIONS": {"charset": "utf8mb4"},
+#     }
+# }
+
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.mysql",
-        "NAME": os.getenv("MYSQL_DATABASE"),
-        "USER": os.getenv("MYSQL_USER"),
-        "PASSWORD": os.getenv("MYSQL_PASSWORD"),
+        "NAME": os.getenv("MYSQL_DATABASE", "rent_db"),
+        "USER": os.getenv("MYSQL_USER", "rent_user"),
+        "PASSWORD": os.getenv("MYSQL_PASSWORD", "rent_pass"),
         "HOST": os.getenv("DB_HOST", "127.0.0.1"),
         "PORT": os.getenv("DB_PORT", "33066"),
         "OPTIONS": {"charset": "utf8mb4"},
     }
 }
-
-
 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -61,6 +71,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     "apps.users.apps.UsersConfig",
+    "apps.listings.apps.ListingsConfig",
 
 ]
 AUTH_USER_MODEL = "users.User"
@@ -76,7 +87,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = 'DjangoProject_mieten.urls'
+ROOT_URLCONF = 'core.urls'
 
 TEMPLATES = [
     {
@@ -94,7 +105,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'DjangoProject_mieten.wsgi.application'
+WSGI_APPLICATION = 'core.wsgi.application'
 
 
 # Database
