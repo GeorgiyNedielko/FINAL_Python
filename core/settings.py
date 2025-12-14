@@ -16,7 +16,9 @@ from pathlib import Path
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+load_dotenv(BASE_DIR / ".env")
 
 #12/12 10.22
 
@@ -72,10 +74,17 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     "apps.users.apps.UsersConfig",
     "apps.listings.apps.ListingsConfig",
+    "rest_framework",
+    "rangefilter",
 
 ]
+
 AUTH_USER_MODEL = "users.User"
 
+REST_FRAMEWORK = {
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 10,
+}
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -149,4 +158,28 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+
+# false datai, Тогда “письмо” будет печататься в консоль runserver, без SMTP.
+# Подготовка Gmail
+# # Зайди в Google Account
+# # Включи 2-step verification
+# # Создай App password
+# # Тип: Mail
+# # Устройство: Django
+# # Сохрани пароль (16 символов). Уже делали раньше, найти старый файл с настройками
+
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+
+EMAIL_HOST = "smtp.gmail.com"
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
+
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+SERVER_EMAIL = EMAIL_HOST_USER
+
+ADMINS = [("Admin", EMAIL_HOST_USER)]
+
 

@@ -35,7 +35,26 @@ class Listing(SoftDeleteModel):
 
     # location = models.CharField(max_length=255, verbose_name="Местоположение")
 
-    price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Цена")
+    class Currency(models.TextChoices):
+        USD = "USD", "USD"
+        EUR = "EUR", "EUR"
+        RUB = "RUB", "RUB"
+        UAH = "UAH", "UAH"
+
+    price = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        verbose_name="Цена"
+    )
+
+    currency = models.CharField(
+        max_length=3,
+        choices=Currency.choices,
+        default=Currency.USD,
+        verbose_name="Валюта"
+    )
+
+    # price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Цена, USD")
     rooms = models.PositiveSmallIntegerField(verbose_name="Количество комнат")
 
     housing_type = models.CharField(

@@ -1,0 +1,28 @@
+Быстрый лайфхак: искать ошибку по файлу
+
+В PyCharm нажми Ctrl+Shift+F и найди строку:
+
+задание 2
++ защита от неправильных данных
+
+http://127.0.0.1:8000/api/listings/?currency=EUR&price_min=70&price_max=90
+http://127.0.0.1:8000/api/listings/?city=Mannheim
+http://127.0.0.1:8000/api/listings/?district=landwehr
+http://127.0.0.1:8000/api/listings/?rooms_min=2&rooms_max=3
+http://127.0.0.1:8000/api/listings/?housing_type=apartment
+http://127.0.0.1:8000/api/listings/?sort=price_asc
+http://127.0.0.1:8000/api/listings/?sort=price_desc
+http://127.0.0.1:8000/api/listings/?sort=date_new
+http://127.0.0.1:8000/api/listings/?sort=date_old
+http://127.0.0.1:8000/api/listings/?date_from=2025-12-01&date_to=2025-12-31
+
+почта тест
+python manage.py shell
+from django.core.mail import mail_admins
+
+mail_admins(
+    subject="TEST: mail_admins works",
+    message="Если это письмо пришло — Gmail SMTP и ADMINS настроены правильно."
+)
+
+
