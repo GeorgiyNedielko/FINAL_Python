@@ -3,6 +3,8 @@ services:
     image: mysql:8.0
     container_name: rent-db
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       MYSQL_DATABASE: ${MYSQL_DATABASE}
       MYSQL_USER: ${MYSQL_USER}
@@ -18,6 +20,24 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: rent-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+  celery:
+    build: .
+    container_name: rent-celery
+    restart: unless-stopped
+    command: celery -A core worker -l info
+    env_file:
+      - .env
+    depends_on:
+      - redis
+      - db
 
 volumes:
   mysql_data:

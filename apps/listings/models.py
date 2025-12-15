@@ -17,6 +17,12 @@ class Listing(SoftDeleteModel):
         PARKING_SPACE = "parking_space", "Паркоместо"
         GARAGE = "garage", "Гараж"
 
+    class Currency(models.TextChoices):
+        USD = "USD", "USD"
+        EUR = "EUR", "EUR"
+        RUB = "RUB", "RUB"
+        UAH = "UAH", "UAH"
+
     owner = models.ForeignKey(settings.AUTH_USER_MODEL,
                               on_delete=models.CASCADE,
                               related_name="listings",
@@ -34,12 +40,6 @@ class Listing(SoftDeleteModel):
     apartment_number = models.CharField(max_length=20, blank=True, default="", verbose_name="Квартира")
 
     # location = models.CharField(max_length=255, verbose_name="Местоположение")
-
-    class Currency(models.TextChoices):
-        USD = "USD", "USD"
-        EUR = "EUR", "EUR"
-        RUB = "RUB", "RUB"
-        UAH = "UAH", "UAH"
 
     price = models.DecimalField(
         max_digits=10,

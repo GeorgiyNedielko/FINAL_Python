@@ -51,8 +51,11 @@ class ListingAdmin(admin.ModelAdmin):
     list_select_related = ("owner",)
 
     def get_queryset(self, request):
+        qs = super().get_queryset(request)
 
-        return Listing.all_objects.select_related("owner")
+        if hasattr(Listing, "is_deleted"):
+            qs = qs.filter(is_deleted=False)
+        return qs
 
     @admin.action(description="Восстановить выбранные (soft delete → restore)")
     def restore_selected(self, request, queryset):
@@ -73,7 +76,7 @@ class ListingAdmin(admin.ModelAdmin):
         address = obj.full_address()
         if not address:
             return "—"
-        url = "https://www.google.com/maps/search/?api=1&query=" + quote_plus(address)
+        url = "https://www.google.com/maps/search/?api=1&query=" + quote_plus(address) # УБРАТЬ ЕНВ
         return format_html('<a href="{}" target="_blank">Открыть</a>', url)
 
     @admin.action(description="Скопировать объявление")

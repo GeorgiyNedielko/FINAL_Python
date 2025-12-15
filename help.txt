@@ -25,4 +25,21 @@ mail_admins(
     message="Если это письмо пришло — Gmail SMTP и ADMINS настроены правильно."
 )
 
+Celery и Redis — это инструменты, которые часто используют вместе в back-end разработке (в том числе с Django и Flask).
+Celery — что это?
 
+Celery — это система для выполнения фоновых (асинхронных) задач.
+То есть задач, которые:
+не нужно выполнять прямо во время HTTP-запроса
+могут быть долгими или тяжёлыми
+Примеры задач для Celery:
+отправка email
+обработка изображений
+генерация отчётов
+уведомления
+периодические задачи (cron)
+обработка платежей
+
+docker run -d --name rent-redis -p 6379:6379 redis:7-alpine
+celery -A core worker --loglevel=info
+celery -A core worker -P solo --loglevel=info

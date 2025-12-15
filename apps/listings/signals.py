@@ -1,9 +1,10 @@
-from django.conf import settings
 from django.core.mail import mail_admins
+from django.db import transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
 from .models import Listing
+from .tasks import delete_listing_if_still_duplicate
 
 
 def _duplicates(instance: Listing):
@@ -36,7 +37,6 @@ def _duplicates(instance: Listing):
 
 @receiver(post_save, sender=Listing)
 def notify_admin_on_create_and_duplicates(sender, instance: Listing, created: bool, **kwargs):
-    # Новое объявление
     if created:
         subject = "New Listing created"
         message = (
@@ -53,9 +53,8 @@ def notify_admin_on_create_and_duplicates(sender, instance: Listing, created: bo
 
         _safe_mail_admins(subject, message)
 
-    # Проверка дубликатов
-    dup_qs = _duplicates(instance)
-    if dup_qs.exists():
+    dup_ids = list(_duplicates(instance).values_list("id", flat=True)[:10])
+    if dup_ids:
         subject = "Duplicate Listing detected"
         message = (
             f"Duplicate listing detected.\n\n"
@@ -64,10 +63,17 @@ def notify_admin_on_create_and_duplicates(sender, instance: Listing, created: bo
             f"Title: {instance.title}\n"
             f"Address: {instance.full_address()}\n"
             f"Price: {instance.price} {instance.currency}\n"
-            f"Duplicate IDs: {list(dup_qs.values_list('id', flat=True)[:10])}\n"
+            f"Duplicate IDs: {dup_ids}\n"
         )
-
         _safe_mail_admins(subject, message)
+
+        if created:
+            transaction.on_commit(
+                lambda: delete_listing_if_still_duplicate.apply_async(
+                    args=[instance.id],
+                    countdown=300,  # 1 час = много
+                )
+            )
 
 
 def _safe_mail_admins(subject: str, message: str):
