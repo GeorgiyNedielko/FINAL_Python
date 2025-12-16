@@ -20,19 +20,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 load_dotenv(BASE_DIR / ".env")
 
-#12/12 10.22
-
-# DATABASES = {
-#     "default": {
-#         "ENGINE": "django.db.backends.mysql",
-#         "NAME": os.getenv("MYSQL_DATABASE"),
-#         "USER": os.getenv("MYSQL_USER"),
-#         "PASSWORD": os.getenv("MYSQL_PASSWORD"),
-#         "HOST": os.getenv("DB_HOST", "127.0.0.1"),
-#         "PORT": os.getenv("DB_PORT", "33066"),
-#         "OPTIONS": {"charset": "utf8mb4"},
-#     }
-# }
 
 DATABASES = {
     "default": {
@@ -84,6 +71,9 @@ AUTH_USER_MODEL = "users.User"
 REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 10,
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ),
 }
 
 MIDDLEWARE = [
@@ -159,14 +149,7 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
-# false datai, Тогда “письмо” будет печататься в консоль runserver, без SMTP.
-# Подготовка Gmail
-# # Зайди в Google Account
-# # Включи 2-step verification
-# # Создай App password
-# # Тип: Mail
-# # Устройство: Django
-# # Сохрани пароль (16 символов). Уже делали раньше, найти старый файл с настройками
+
 
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 
@@ -188,3 +171,8 @@ CELERY_RESULT_BACKEND = "redis://127.0.0.1:6379/0"
 
 
 CELERY_TIMEZONE = "UTC"
+
+MAPS_SEARCH_URL = os.getenv(
+    "MAPS_SEARCH_URL",
+    "https://www.google.com/maps/search/?api=1&query="
+)

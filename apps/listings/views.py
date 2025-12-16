@@ -1,4 +1,3 @@
-
 from decimal import Decimal, InvalidOperation
 
 from django.core.paginator import Paginator
@@ -6,7 +5,49 @@ from django.db.models import Q
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
 
+from rest_framework import viewsets, permissions, status
+from rest_framework.decorators import action
+from rest_framework.response import Response
+
+from django.db import transaction
+
 from .models import Listing
+from .serializers import ListingSerializer
+from .permissions import IsLandlord, IsOwnerOrReadOnly
+
+
+class ListingViewSet(viewsets.ModelViewSet):
+    queryset = Listing.objects.all()
+    serializer_class = ListingSerializer
+
+    # Дает автоматически endpoints:
+       # GET / listings / — список
+    #    # GET / listings / < id > / — одно    # объявление
+    #     # POST / listings / — создать
+    #     # PUT / PATCH / listings / < id > / — изменить
+    #     # DELETE / listings / < id > / — удалить
+
+    def get_permissions(self):
+        if self.action in ("create",):
+            return [permissions.IsAuthenticated(), IsLandlord()]
+        if self.action in ("update", "partial_update", "destroy", "copy"):
+            return [permissions.IsAuthenticated(), IsOwnerOrReadOnly()]
+        return [permissions.AllowAny()]
+
+    @action(detail=True, methods=["post"])
+    def copy(self, request, pk=None):
+        original = self.get_object()
+
+        with transaction.atomic():
+            original.pk = None
+            original.id = None
+            original.title = f"{original.title} (copy)"
+            original.owner = request.user
+            original.save()
+
+        return Response(self.get_serializer(original).data, status=status.HTTP_201_CREATED)
+
+
 
 def _to_int(v):
     try:

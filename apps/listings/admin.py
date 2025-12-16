@@ -5,7 +5,7 @@ from urllib.parse import quote_plus
 from rangefilter.filters import DateTimeRangeFilter
 
 from .models import Listing
-
+from django.conf import settings
 
 @admin.register(Listing)
 class ListingAdmin(admin.ModelAdmin):
@@ -43,6 +43,7 @@ class ListingAdmin(admin.ModelAdmin):
         "postal_code",
         "owner__email",
     )
+    readonly_fields = ("created_at", "updated_at")
 
     ordering = ("-created_at",)
 
@@ -76,7 +77,8 @@ class ListingAdmin(admin.ModelAdmin):
         address = obj.full_address()
         if not address:
             return "—"
-        url = "https://www.google.com/maps/search/?api=1&query=" + quote_plus(address) # УБРАТЬ ЕНВ
+
+        url = settings.MAPS_SEARCH_URL + quote_plus(address)
         return format_html('<a href="{}" target="_blank">Открыть</a>', url)
 
     @admin.action(description="Скопировать объявление")
