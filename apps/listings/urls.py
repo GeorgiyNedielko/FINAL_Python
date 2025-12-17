@@ -1,7 +1,14 @@
-from django.urls import path
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
 
-from .api import ListingListAPIView
+from .views import ListingViewSet
+
+from .views import listings_search
+
+router = DefaultRouter()
+router.register(r"listings", ListingViewSet, basename="listing")
 
 urlpatterns = [
-    path("api/listings/", ListingListAPIView.as_view(), name="listings_api"),
+    path("", include(router.urls)),
+    path("listings-search/", listings_search, name="listings_search"),
 ]

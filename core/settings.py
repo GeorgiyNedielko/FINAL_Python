@@ -15,23 +15,11 @@ from pathlib import Path
 
 import os
 from dotenv import load_dotenv
+from datetime import timedelta
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 load_dotenv(BASE_DIR / ".env")
-
-
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.mysql",
-        "NAME": os.getenv("MYSQL_DATABASE", "rent_db"),
-        "USER": os.getenv("MYSQL_USER", "rent_user"),
-        "PASSWORD": os.getenv("MYSQL_PASSWORD", "rent_pass"),
-        "HOST": os.getenv("DB_HOST", "127.0.0.1"),
-        "PORT": os.getenv("DB_PORT", "33066"),
-        "OPTIONS": {"charset": "utf8mb4"},
-    }
-}
 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -46,8 +34,8 @@ SECRET_KEY = 'django-insecure-euu0#f4qi*sd3k8ica#%szofpyj8ugye_*s6c&r2(99$_vd@vf
 
 # SECURITY WARNING: don't run with debug turned on in production!
 
-DEBUG = os.getenv("DEBUG", "0") == "1"            #12/12 10.22
-ALLOWED_HOSTS = ["localhost", "127.0.0.1"]          #12/12 10.22
+DEBUG = os.getenv("DEBUG", "0") == "1"
+ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 
 
 # Application definition
@@ -110,7 +98,17 @@ WSGI_APPLICATION = 'core.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.mysql",
+        "NAME": os.getenv("MYSQL_DATABASE", "rent_db"),
+        "USER": os.getenv("MYSQL_USER", "rent_user"),
+        "PASSWORD": os.getenv("MYSQL_PASSWORD", "rent_pass"),
+        "HOST": os.getenv("DB_HOST", "127.0.0.1"),
+        "PORT": os.getenv("DB_PORT", "33066"),
+        "OPTIONS": {"charset": "utf8mb4"},
+    }
+}
 
 
 # Password validation
@@ -176,3 +174,10 @@ MAPS_SEARCH_URL = os.getenv(
     "MAPS_SEARCH_URL",
     "https://www.google.com/maps/search/?api=1&query="
 )
+
+
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+}

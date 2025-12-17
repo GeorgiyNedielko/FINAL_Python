@@ -16,6 +16,36 @@ http://127.0.0.1:8000/api/listings/?sort=date_new
 http://127.0.0.1:8000/api/listings/?sort=date_old
 http://127.0.0.1:8000/api/listings/?date_from=2025-12-01&date_to=2025-12-31
 
+http://127.0.0.1:8000/api/auth/registr/
+{
+  "email": "landlord2@test.com",
+  "username": "landlord2",
+  "password": "Qwerty123!!",
+  "role": "landlord"
+}
+http://127.0.0.1:8000/api/auth/login/
+{
+  "email": "landlord2@test.com",
+  "password": "Qwerty123!!"
+}
+
+http://127.0.0.1:8000/api/listings/
+{
+  "title": "Apartment in center",
+  "description": "Nice apartment",
+  "price": "1300.00",
+  "currency": "EUR",
+  "rooms": 22,
+  "housing_type": "apartment",
+  "parking_type": "none",
+  "country": "Germany",
+  "city": "Berlin",
+  "street": "Main",
+  "house_number": "10"
+}
+делит + обновление работает, ограничение прав то же
+
+
 почта тест
 python manage.py shell
 from django.core.mail import mail_admins

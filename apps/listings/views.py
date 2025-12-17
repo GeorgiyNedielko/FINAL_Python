@@ -27,6 +27,12 @@ class ListingViewSet(viewsets.ModelViewSet):
     #     # PUT / PATCH / listings / < id > / — изменить
     #     # DELETE / listings / < id > / — удалить
 
+    def perform_create(self, serializer):
+        serializer.save(owner=self.request.user)
+
+    # django.db.utils.IntegrityError: (1048, "Column 'owner_id' cannot be null")
+    # [17 / Dec / 2025 10: 50:26] "POST /api/listings/ HTTP/1.1" 500 295302
+
     def get_permissions(self):
         if self.action in ("create",):
             return [permissions.IsAuthenticated(), IsLandlord()]
@@ -51,7 +57,7 @@ class ListingViewSet(viewsets.ModelViewSet):
 
 def _to_int(v):
     try:
-        return (v)
+        return int(v)
     except (TypeError,ValueError):
         return None
 
