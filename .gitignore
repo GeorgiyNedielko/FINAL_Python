@@ -16,3 +16,9 @@ staticfiles/
 
 # Docker
 *.env
+
+
+# Celery beat
+celerybeat-schedule
+celerybeat-schedule-shm
+celerybeat-schedule-wal

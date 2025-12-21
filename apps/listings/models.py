@@ -39,7 +39,7 @@ class Listing(SoftDeleteModel):
     floor = models.CharField(max_length=20, blank=True, default="", verbose_name="Этаж")
     apartment_number = models.CharField(max_length=20, blank=True, default="", verbose_name="Квартира")
 
-    # location = models.CharField(max_length=255, verbose_name="Местоположение")
+
 
     price = models.DecimalField(
         max_digits=10,
@@ -82,7 +82,7 @@ class Listing(SoftDeleteModel):
     def __str__(self) -> str:
         return f"{self.title} — {self.price}"
 
-    #ПРОБА ГУГЛ + 36(-) location....
+
 
     def full_address(self) -> str:
         """
@@ -106,3 +106,17 @@ class Listing(SoftDeleteModel):
         if extra and base:
             return f"{base}, " + ", ".join(extra)
         return base or ", ".join(extra) or ""
+
+class ListingViewStat(models.Model):
+    listing = models.OneToOneField(
+        Listing,
+        on_delete=models.CASCADE,
+        related_name="view_stat",
+        primary_key=True,
+    )
+    views_total = models.PositiveIntegerField(default=0)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.listing_id}: {self.views_total}"
+

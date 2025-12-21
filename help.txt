@@ -46,6 +46,42 @@ http://127.0.0.1:8000/api/listings/
 делит + обновление работает, ограничение прав то же
 
 
+Scripts → Post-response (Tests) фиксируем токены
+const json = pm.response.json();
+
+pm.environment.set("access_token", json.access);
+pm.environment.set("refresh_token", json.refresh);
+////
+
+const json = pm.response.json();
+console.log("LOGIN RESPONSE:", json);
+
+// пишем в ENV (не в collection!)
+pm.environment.set("access_token", json.access);
+pm.environment.set("refresh_token", json.refresh);
+
+// контроль: покажем что записали
+console.log("SAVED access_token:", pm.environment.get("access_token"));
+console.log("SAVED refresh_token:", pm.environment.get("refresh_token"));
+/////
+const json = pm.response.json();
+
+// Сохраняем именно в ENVIRONMENT
+pm.environment.set("access_token", json.access);
+pm.environment.set("refresh_token", json.refresh);
+
+// Для контроля — выведем в консоль
+console.log("access_token set:", pm.environment.get("access_token") ? "YES" : "NO");
+
+
+
+
+В коллекции (My Collection):
+Authorization
+Type: Bearer Token
+Token:
+{{access_token}}
+
 почта тест
 python manage.py shell
 from django.core.mail import mail_admins
@@ -72,7 +108,13 @@ Celery — это система для выполнения фоновых (а�
 
 docker run -d --name rent-redis -p 6379:6379 redis:7-alpine
 celery -A core worker --loglevel=info
+
 celery -A core worker -P solo --loglevel=info
+celery -A core beat --loglevel=info
+
+docker exec -it rent-redis redis-cli
+GET listing:20:views
+
 
 Да, надо запускать каждый раз, когда ты:
 перезапускаешь компьютер

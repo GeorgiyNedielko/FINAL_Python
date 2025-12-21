@@ -17,6 +17,15 @@ import os
 from dotenv import load_dotenv
 from datetime import timedelta
 
+from celery.schedules import crontab
+
+CELERY_BEAT_SCHEDULE = {
+    "flush-listing-views-every-minute": {
+        "task": "apps.listings.tasks.flush_listing_views_to_db",
+        "schedule": crontab(minute="*/1"),
+    },
+}
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 load_dotenv(BASE_DIR / ".env")
@@ -181,3 +190,15 @@ SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
 }
+
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": "redis://127.0.0.1:6379/1",
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        }
+    }
+}
+
+REDIS_URL = "redis://127.0.0.1:6379/0"

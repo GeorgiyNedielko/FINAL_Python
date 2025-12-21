@@ -15,6 +15,8 @@ from .models import Listing
 from .serializers import ListingSerializer
 from .permissions import IsLandlord, IsOwnerOrReadOnly
 
+from .tasks import track_listing_view
+
 
 class ListingViewSet(viewsets.ModelViewSet):
     queryset = Listing.objects.all()
@@ -53,7 +55,13 @@ class ListingViewSet(viewsets.ModelViewSet):
 
         return Response(self.get_serializer(original).data, status=status.HTTP_201_CREATED)
 
+    def retrieve(self, request, *args, **kwargs):
+        obj = self.get_object()
 
+        track_listing_view.delay(obj.id)
+        serializer = self.get_serializer(obj)
+
+        return super().retrieve(request, *args, **kwargs)
 
 def _to_int(v):
     try:
@@ -176,3 +184,6 @@ def listings_search(request):
         "warnings": warnings,
         "results": results,
     }, json_dumps_params={"ensure_ascii": False})
+
+
+
