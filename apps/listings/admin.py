@@ -53,7 +53,7 @@ class ListingAdmin(admin.ModelAdmin):
     list_select_related = ("owner",)
 
     def get_queryset(self, request):
-        qs = super().get_queryset(request)
+        return Listing.all_objects.all()
 
 
         subq = ListingViewStat.objects.filter(

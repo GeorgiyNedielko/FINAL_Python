@@ -115,6 +115,9 @@ celery -A core beat --loglevel=info
 docker exec -it rent-redis redis-cli
 GET listing:20:views
 
+И тогда файлов вообще не будет, всё хранится в БД.
+celery -A core beat --scheduler django_celery_beat.schedulers:DatabaseScheduler
+
 
 Да, надо запускать каждый раз, когда ты:
 перезапускаешь компьютер
@@ -124,3 +127,11 @@ GET listing:20:views
 1 терминал → python manage.py runserver
 2 терминал → celery -A core worker -P solo --loglevel=info
 Это нормально для разработки.
+
+http://127.0.0.1:8000/api/auth/login/
+{
+  "email": "tenant@test.com",
+  "password": "password123"
+}
+
+Бронирование

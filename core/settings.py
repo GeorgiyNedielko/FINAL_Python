@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     "apps.listings.apps.ListingsConfig",
     "rest_framework",
     "rangefilter",
+    "apps.bookings.apps.BookingsConfig",
 
 ]
 
