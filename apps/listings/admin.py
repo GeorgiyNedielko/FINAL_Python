@@ -53,8 +53,7 @@ class ListingAdmin(admin.ModelAdmin):
     list_select_related = ("owner",)
 
     def get_queryset(self, request):
-        return Listing.all_objects.all()
-
+        qs = Listing.all_objects.all()
 
         subq = ListingViewStat.objects.filter(
             listing_id=OuterRef("pk")
@@ -64,7 +63,6 @@ class ListingAdmin(admin.ModelAdmin):
             _views_total=Coalesce(Subquery(subq, output_field=IntegerField()), Value(0))
         )
 
-        # твоя логика soft-delete
         if hasattr(Listing, "is_deleted"):
             qs = qs.filter(is_deleted=False)
 
@@ -111,11 +109,8 @@ class ListingViewStatAdmin(admin.ModelAdmin):
         "views_total",
         "updated_at",
     )
-    search_fields = (
-        "listing__id",
-        "listing__title",
-        "listing__owner__email",
-    )
+    search_fields = ("listing__id", "listing__title", "listing__owner__email")
+
     ordering = ("-views_total",)
     list_select_related = ("listing",)
 

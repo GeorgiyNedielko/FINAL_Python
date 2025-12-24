@@ -58,10 +58,12 @@ class ListingViewSet(viewsets.ModelViewSet):
     def retrieve(self, request, *args, **kwargs):
         obj = self.get_object()
 
-        track_listing_view.delay(obj.id)
-        serializer = self.get_serializer(obj)
+        user_id = request.user.id if request.user.is_authenticated else None
+        track_listing_view.delay(obj.id, user_id, obj.owner_id)
 
-        return super().retrieve(request, *args, **kwargs)
+        serializer = self.get_serializer(obj)
+        return Response(serializer.data)
+
 
 def _to_int(v):
     try:

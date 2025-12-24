@@ -75,3 +75,5 @@ class BookingViewSet(viewsets.ModelViewSet):
         booking.decided_by = request.user
         booking.save(update_fields=["status", "decided_at", "decided_by", "updated_at"])
         return Response({"detail": "Отклонено."})
+
+

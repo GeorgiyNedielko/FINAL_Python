@@ -20,3 +20,8 @@ class User(AbstractUser):
 
     def __str__(self):
         return self.email
+
+class UserBlock(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    reason = models.TextField()
+    blocked_at = models.DateTimeField(auto_now_add=True)

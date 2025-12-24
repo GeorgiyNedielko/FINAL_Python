@@ -62,16 +62,18 @@ KEY_RE = re.compile(r"^listing:(\d+):views$")
 
 
 @shared_task(bind=True, ignore_result=True)
-def track_listing_view(self, listing_id: int) -> None:
+def track_listing_view(self, listing_id: int, user_id: int | None = None, owner_id: int | None = None) -> None:
     """
     Вызываем на detail endpoint.
     Пишем счётчик просмотров в Redis.
     """
+    # если это владелец — не считаем (если owner_id передали)
+    if user_id and owner_id and user_id == owner_id:
+        return
+
     r = get_redis_client()
 
-
     r.incr(f"listing:{listing_id}:views", 1)
-
 
     day = timezone.localdate().isoformat()
     r.incr(f"listing:{listing_id}:views:{day}", 1)
