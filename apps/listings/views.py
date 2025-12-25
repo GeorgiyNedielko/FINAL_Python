@@ -16,7 +16,10 @@ from rest_framework.response import Response
 from .models import Listing, ListingViewStat
 from .serializers import ListingSerializer
 from .permissions import IsLandlord, IsOwnerOrReadOnly
-from .tasks import track_listing_view
+from .tasks import track_listing_view, save_listing_view_event
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
+
 
 
 class ListingViewSet(viewsets.ModelViewSet):
@@ -45,6 +48,8 @@ class ListingViewSet(viewsets.ModelViewSet):
             qs = qs.order_by("avg_rating", "reviews_count", "-created_at")
         elif sort == "views_desc":
             qs = qs.order_by("-_views_total", "-created_at")
+        elif sort == "reviews_desc":
+            qs = qs.order_by("-reviews_count", "-avg_rating", "-created_at")
         else:
             qs = qs.order_by("-created_at")
 
@@ -79,8 +84,47 @@ class ListingViewSet(viewsets.ModelViewSet):
         user_id = request.user.id if request.user.is_authenticated else None
         track_listing_view.delay(obj.id, user_id, obj.owner_id)
 
+        if request.user.is_authenticated:
+            save_listing_view_event.delay(obj.id, request.user.id)
+
         serializer = self.get_serializer(obj)
         return Response(serializer.data)
+
+    @action(detail=False, methods=["get"], url_path="popular")
+    def popular(self, request):
+        limit = _to_int(request.query_params.get("limit")) or 10
+        limit = max(1, min(limit, 100))
+
+        qs = self.get_queryset().order_by("-_views_total", "-created_at")[:limit]
+        return Response(self.get_serializer(qs, many=True).data)
+
+    @action(
+        detail=False,
+        methods=["get"],
+        permission_classes=[permissions.IsAuthenticated],
+        url_path="my-view-history",
+    )
+    def my_view_history(self, request):
+        limit = _to_int(request.query_params.get("limit")) or 50
+        limit = max(1, min(limit, 200))
+
+        from .models import ListingViewEvent
+
+        listing_ids = list(
+            ListingViewEvent.objects
+            .filter(user_id=request.user.id)
+            .order_by("-created_at")
+            .values_list("listing_id", flat=True)[:limit]
+        )
+
+        if not listing_ids:
+            return Response([])
+
+        qs = self.get_queryset().filter(id__in=listing_ids)
+        id_to_obj = {x.id: x for x in qs}
+        ordered = [id_to_obj[i] for i in listing_ids if i in id_to_obj]
+
+        return Response(self.get_serializer(ordered, many=True).data)
 
 
 def _to_int(v):
@@ -108,7 +152,22 @@ def listings_search(request):
 
     q = request.GET.get("q")
     if q:
-        qs = qs.filter(Q(title__icontains=q) | Q(description__icontains=q))
+        q_clean = q.strip()
+        if q_clean:
+            from .models import SearchQuery
+            SearchQuery.objects.create(
+                user=request.user if request.user.is_authenticated else None,
+                query=q_clean[:255],
+            )
+
+        qs = qs.filter(
+            Q(title__icontains=q) |
+            Q(description__icontains=q) |
+            Q(city__icontains=q) |
+            Q(country__icontains=q) |
+            Q(street__icontains=q) |
+            Q(postal_code__icontains=q)
+        )
 
     country = request.GET.get("country")
     if country:
@@ -153,6 +212,8 @@ def listings_search(request):
         qs = qs.order_by("-avg_rating", "-reviews_count", "-created_at")
     elif sort == "rating_asc":
         qs = qs.order_by("avg_rating", "reviews_count", "-created_at")
+    elif sort == "reviews_desc":
+        qs = qs.order_by("-reviews_count", "-avg_rating", "-created_at")
     elif sort == "price_asc":
         qs = qs.order_by("price", "-created_at")
     elif sort == "price_desc":
@@ -201,3 +262,20 @@ def listings_search(request):
         "warnings": warnings,
         "results": results,
     }, json_dumps_params={"ensure_ascii": False})
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def popular_searches(request):
+    limit = _to_int(request.GET.get("limit")) or 20
+    limit = max(1, min(limit, 100))
+
+    from .models import SearchQuery
+
+    data = (
+        SearchQuery.objects
+        .values("query")
+        .annotate(cnt=Count("id"))
+        .order_by("-cnt", "query")[:limit]
+    )
+
+    return Response(list(data))

@@ -1,5 +1,4 @@
 
-# Create your models here.
 
 from django.conf import settings
 from django.db import models
@@ -84,9 +83,7 @@ class Listing(SoftDeleteModel):
 
 
     def full_address(self) -> str:
-        """
-        Собираем адрес одной строкой (для отображения и Google Maps).
-        """
+
         parts = [
             self.country,
             self.city,
@@ -119,3 +116,47 @@ class ListingViewStat(models.Model):
     def __str__(self):
         return f"{self.listing_id}: {self.views_total}"
 
+class ListingViewEvent(models.Model):
+    listing = models.ForeignKey(
+        "listings.Listing",
+        on_delete=models.CASCADE,
+        related_name="view_events",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="listing_views",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["user", "created_at"]),
+            models.Index(fields=["listing", "created_at"]),
+        ]
+
+    def __str__(self):
+        return f"user={self.user_id} listing={self.listing_id}"
+
+class SearchQuery(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="search_queries",
+    )
+    query = models.CharField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["query"]),
+            models.Index(fields=["created_at"]),
+            models.Index(fields=["query", "created_at"]),
+        ]
+
+    def __str__(self):
+        return self.query

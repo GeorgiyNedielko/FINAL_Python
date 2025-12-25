@@ -3,12 +3,9 @@ import re
 from celery import shared_task
 from django.db import transaction
 from django.db.models import F
-from django.utils import timezone
 
 from apps.common.redis_client import get_redis_client
 from .models import Listing, ListingViewStat
-
-
 
 
 def _duplicates_for_listing(listing: Listing):
@@ -44,18 +41,17 @@ def delete_listing_if_still_duplicate(listing_id: int):
     try:
         listing = Listing.all_objects.get(pk=listing_id)
     except Listing.DoesNotExist:
-        return
+        return {"ok": False, "reason": "listing_not_found"}
 
     if not _duplicates_for_listing(listing).exists():
-        return
+        return {"ok": True, "deleted": False, "reason": "no_duplicates"}
 
     if hasattr(Listing, "_meta") and any(f.name == "is_deleted" for f in Listing._meta.fields):
         Listing.all_objects.filter(pk=listing_id, is_deleted=False).update(is_deleted=True)
-        return
+        return {"ok": True, "deleted": True, "soft": True}
 
     Listing.all_objects.filter(pk=listing_id).delete()
-
-
+    return {"ok": True, "deleted": True, "soft": False}
 
 
 KEY_RE = re.compile(r"^listing:(\d+):views$")
@@ -63,30 +59,17 @@ KEY_RE = re.compile(r"^listing:(\d+):views$")
 
 @shared_task(bind=True, ignore_result=True)
 def track_listing_view(self, listing_id: int, user_id: int | None = None, owner_id: int | None = None) -> None:
-    """
-    Вызываем на detail endpoint.
-    Пишем счётчик просмотров в Redis.
-    """
-    # если это владелец — не считаем (если owner_id передали)
+
     if user_id and owner_id and user_id == owner_id:
         return
 
     r = get_redis_client()
-
     r.incr(f"listing:{listing_id}:views", 1)
-
-    day = timezone.localdate().isoformat()
-    r.incr(f"listing:{listing_id}:views:{day}", 1)
 
 
 @shared_task(bind=True)
 def flush_listing_views_to_db(self, batch_size: int = 500) -> dict:
-    """
-    Раз в минуту (celery beat):
-    - ищет listing:*:views
-    - атомарно забирает значение и удаляет ключ (GET+DEL в pipeline)
-    - прибавляет к ListingViewStat.views_total
-    """
+
     r = get_redis_client()
 
     cursor = 0
@@ -97,11 +80,10 @@ def flush_listing_views_to_db(self, batch_size: int = 500) -> dict:
     while True:
         cursor, keys = r.scan(cursor=cursor, match="listing:*:views", count=batch_size)
 
-        if keys:
-            keys_found += len(keys)
+        keys = [k for k in keys if KEY_RE.match(k)]
+        keys_found += len(keys)
 
         for key in keys:
-
             m = KEY_RE.match(key)
             if not m:
                 continue
@@ -118,9 +100,8 @@ def flush_listing_views_to_db(self, batch_size: int = 500) -> dict:
 
             try:
                 delta = int(value)
-            except ValueError:
+            except (TypeError, ValueError):
                 continue
-
 
             with transaction.atomic():
                 ListingViewStat.objects.get_or_create(
@@ -143,3 +124,11 @@ def flush_listing_views_to_db(self, batch_size: int = 500) -> dict:
         "listings_updated": listings_updated,
         "total_increment": total_increment,
     }
+
+
+@shared_task
+def save_listing_view_event(listing_id: int, user_id: int):
+
+    from apps.listings.models import ListingViewEvent
+    ListingViewEvent.objects.create(listing_id=listing_id, user_id=user_id)
+    return {"ok": True}
