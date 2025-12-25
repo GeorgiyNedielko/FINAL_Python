@@ -54,7 +54,6 @@ class Listing(SoftDeleteModel):
         verbose_name="Валюта"
     )
 
-    # price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Цена, USD")
     rooms = models.PositiveSmallIntegerField(verbose_name="Количество комнат")
 
     housing_type = models.CharField(

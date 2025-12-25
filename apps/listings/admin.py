@@ -10,6 +10,7 @@ from rangefilter.filters import DateTimeRangeFilter
 
 from .models import Listing, ListingViewStat
 
+from django.db.models import OuterRef, Subquery, IntegerField, Value, Avg, Count, FloatField
 
 @admin.register(Listing)
 class ListingAdmin(admin.ModelAdmin):
@@ -23,10 +24,13 @@ class ListingAdmin(admin.ModelAdmin):
         "is_active",
         "owner",
         "views_total_admin",
+        "avg_rating_admin",
+        "reviews_count_admin",
         "maps_link",
         "is_deleted",
         "created_at",
     )
+
 
     list_filter = (
         ("created_at", DateTimeRangeFilter),
@@ -60,7 +64,9 @@ class ListingAdmin(admin.ModelAdmin):
         ).values("views_total")[:1]
 
         qs = qs.annotate(
-            _views_total=Coalesce(Subquery(subq, output_field=IntegerField()), Value(0))
+            _views_total=Coalesce(Subquery(subq, output_field=IntegerField()), Value(0)),
+            _avg_rating=Coalesce(Avg("reviews__rating"), Value(0.0), output_field=FloatField()),
+            _reviews_count=Count("reviews", distinct=True),
         )
 
         if hasattr(Listing, "is_deleted"):
@@ -101,6 +107,13 @@ class ListingAdmin(admin.ModelAdmin):
             obj.id = None
             obj.save()
 
+    @admin.display(description="Рейтинг", ordering="_avg_rating")
+    def avg_rating_admin(self, obj: Listing):
+        return round(float(getattr(obj, "_avg_rating", 0.0)), 2)
+
+    @admin.display(description="Отзывов", ordering="_reviews_count")
+    def reviews_count_admin(self, obj: Listing):
+        return int(getattr(obj, "_reviews_count", 0))
 
 @admin.register(ListingViewStat)
 class ListingViewStatAdmin(admin.ModelAdmin):

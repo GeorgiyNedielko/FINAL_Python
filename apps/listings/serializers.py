@@ -5,6 +5,9 @@ from .models import Listing
 class ListingSerializer(serializers.ModelSerializer):
     full_address = serializers.SerializerMethodField()
 
+    avg_rating = serializers.FloatField(read_only=True)
+    reviews_count = serializers.IntegerField(read_only=True)
+
     class Meta:
         model = Listing
         fields = "__all__"

@@ -1,7 +1,11 @@
+# apps/listings/views.py
+
 from decimal import Decimal, InvalidOperation
 
 from django.core.paginator import Paginator
-from django.db.models import Q
+from django.db import transaction
+from django.db.models import Q, OuterRef, Subquery, IntegerField, Value, Avg, Count
+from django.db.models.functions import Coalesce
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
 
@@ -9,34 +13,48 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from django.db import transaction
-
-from .models import Listing
+from .models import Listing, ListingViewStat
 from .serializers import ListingSerializer
 from .permissions import IsLandlord, IsOwnerOrReadOnly
-
 from .tasks import track_listing_view
 
 
 class ListingViewSet(viewsets.ModelViewSet):
-    queryset = Listing.objects.all()
     serializer_class = ListingSerializer
 
-    # Дает автоматически endpoints:
-       # GET / listings / — список
-    #    # GET / listings / < id > / — одно    # объявление
-    #     # POST / listings / — создать
-    #     # PUT / PATCH / listings / < id > / — изменить
-    #     # DELETE / listings / < id > / — удалить
+    def get_queryset(self):
+        qs = Listing.objects.filter(is_active=True).annotate(
+            avg_rating=Coalesce(Avg("reviews__rating"), 0.0),
+            reviews_count=Count("reviews", distinct=True),
+        )
+
+        subq = (
+            ListingViewStat.objects
+            .filter(listing_id=OuterRef("pk"))
+            .values("views_total")[:1]
+        )
+
+        qs = qs.annotate(
+            _views_total=Coalesce(Subquery(subq, output_field=IntegerField()), Value(0))
+        )
+
+        sort = self.request.query_params.get("sort")
+        if sort == "rating_desc":
+            qs = qs.order_by("-avg_rating", "-reviews_count", "-created_at")
+        elif sort == "rating_asc":
+            qs = qs.order_by("avg_rating", "reviews_count", "-created_at")
+        elif sort == "views_desc":
+            qs = qs.order_by("-_views_total", "-created_at")
+        else:
+            qs = qs.order_by("-created_at")
+
+        return qs
 
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)
 
-    # django.db.utils.IntegrityError: (1048, "Column 'owner_id' cannot be null")
-    # [17 / Dec / 2025 10: 50:26] "POST /api/listings/ HTTP/1.1" 500 295302
-
     def get_permissions(self):
-        if self.action in ("create",):
+        if self.action == "create":
             return [permissions.IsAuthenticated(), IsLandlord()]
         if self.action in ("update", "partial_update", "destroy", "copy"):
             return [permissions.IsAuthenticated(), IsOwnerOrReadOnly()]
@@ -68,8 +86,9 @@ class ListingViewSet(viewsets.ModelViewSet):
 def _to_int(v):
     try:
         return int(v)
-    except (TypeError,ValueError):
+    except (TypeError, ValueError):
         return None
+
 
 def _to_decimal(v):
     try:
@@ -77,24 +96,14 @@ def _to_decimal(v):
     except (TypeError, ValueError, InvalidOperation):
         return None
 
+
 @require_GET
 def listings_search(request):
-    """
-      GET /api/listings/
-      Поиск:
-        - q: ключевые слова (title, description)
-      Фильтры:
-        - price_min, price_max
-        - city
-        - street/postal_code
-        - rooms_min, rooms_max
-        - housing_type (apartment/house/room)
-      Сортировка:
-        - sort=price_asc | price_desc | date_new | date_old
-      Пагинация:
-        - page, page_size
-      """
-    qs = Listing.objects.filter(is_active=True)
+    qs = Listing.objects.filter(is_active=True).annotate(
+        avg_rating=Coalesce(Avg("reviews__rating"), 0.0),
+        reviews_count=Count("reviews", distinct=True),
+    )
+
     warnings = []
 
     q = request.GET.get("q")
@@ -104,8 +113,6 @@ def listings_search(request):
     country = request.GET.get("country")
     if country:
         qs = qs.filter(country__icontains=country)
-
-    #i → insensitive (регистронезависимый),contains → содержит
 
     district = request.GET.get("district")
     if district:
@@ -132,7 +139,9 @@ def listings_search(request):
 
     if (price_min is not None or price_max is not None) and not currency:
         warnings.append(
-            "Вы используете price_min/price_max без currency. Сравнение будет выполнено по числам во всех валютах сразу.")
+            "Вы используете price_min/price_max без currency. "
+            "Сравнение будет выполнено по числам во всех валютах сразу."
+        )
 
     if price_min is not None:
         qs = qs.filter(price__gte=price_min)
@@ -140,7 +149,11 @@ def listings_search(request):
         qs = qs.filter(price__lte=price_max)
 
     sort = request.GET.get("sort", "date_new")
-    if sort == "price_asc":
+    if sort == "rating_desc":
+        qs = qs.order_by("-avg_rating", "-reviews_count", "-created_at")
+    elif sort == "rating_asc":
+        qs = qs.order_by("avg_rating", "reviews_count", "-created_at")
+    elif sort == "price_asc":
         qs = qs.order_by("price", "-created_at")
     elif sort == "price_desc":
         qs = qs.order_by("-price", "-created_at")
@@ -176,6 +189,8 @@ def listings_search(request):
             "apartment_number": x.apartment_number,
             "full_address": x.full_address(),
             "created_at": x.created_at.isoformat() if x.created_at else None,
+            "avg_rating": float(getattr(x, "avg_rating", 0.0)),
+            "reviews_count": int(getattr(x, "reviews_count", 0)),
         })
 
     return JsonResponse({
@@ -186,6 +201,3 @@ def listings_search(request):
         "warnings": warnings,
         "results": results,
     }, json_dumps_params={"ensure_ascii": False})
-
-
-
