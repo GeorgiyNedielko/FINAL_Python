@@ -1,0 +1,188 @@
+1) apps.py
+
+ регистрирует Django-приложение apps.bookings.
+
+default_auto_field = BigAutoField — автоинкрементный id будет большого размера.
+
+name = "apps.bookings" — путь приложения для INSTALLED_APPS.
+
+2) models.py (модель бронирования)
+
+Главная сущность: Booking — бронь конкретного объявления (Listing) конкретным пользователем (tenant) на диапазон дат.
+
+Поля:
+
+listing (FK на Listing) — какое объявление бронируют.
+related_name="bookings" → у listing будет listing.bookings.all().
+
+tenant (FK на AUTH_USER_MODEL) — кто бронирует.
+related_name="bookings" → у пользователя будет user.bookings.all().
+
+date_from, date_to — период проживания.
+
+status — статус бронирования (TextChoices):
+
+pending ожидает решения
+
+approved подтверждено
+
+rejected отклонено
+
+canceled отменено
+
+completed завершено
+
+decided_at, decided_by — когда и кем подтверждено/отклонено (обычно owner или админ).
+
+canceled_at — время отмены.
+
+created_at, updated_at — аудит.
+
+Meta:
+
+ordering = ("-created_at",) — новые брони сверху.
+
+индексы ускоряют частые запросы:
+
+(listing, status, date_from, date_to) — поиск пересечений и активных броней по объявлению
+
+(tenant, status, date_from) — выборка броней арендатора
+
+Методы:
+
+__str__ — удобная строка для логов/админки.
+
+can_cancel() — отмена разрешена только если:
+
+сегодня меньше date_from
+
+статус pending или approved
+
+3) permissions.py
+
+IsTenant — доступ к объекту только если текущий пользователь = арендатор брони:
+
+obj.tenant_id == request.user.id
+
+IsListingOwner — доступ только если текущий пользователь = владелец объявления у брони:
+
+obj.listing.owner_id == request.user.id
+
+4) serializers.py
+BookingCreateSerializer
+
+Используется при create.
+Отдаёт поля: id, listing, date_from, date_to, status, created_at, но status и created_at read-only.
+
+Валидация:
+
+date_from < date_to
+
+listing должен быть активным: listing.is_active
+
+нельзя бронировать своё объявление: listing.owner_id != user.id
+
+проверка пересечений дат с существующими активными бронями (pending/approved):
+
+пересечение считается так:
+
+date_from__lt date_to и date_to__gt date_from
+
+create():
+
+tenant берётся из request.user, клиент его не присылает (это правильно).
+
+BookingSerializer
+
+Используется для чтения (list/retrieve).
+
+Добавляет удобные read-only поля:
+
+listing_title
+
+listing_owner_id
+
+Выдаёт все поля брони, и все они read-only (т.к. read_only_fields = fields).
+
+5) tasks.py (Celery email-уведомления)
+
+Тут три асинхронные задачи (Celery), чтобы отправка писем не тормозила API.
+
+Общее:
+
+@shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=5)
+
+если ошибка — задача ретраится автоматически с увеличением задержки
+
+send_booking_created_email(booking_id)
+
+Загружает бронь + tenant + listing + owner через select_related (быстрее).
+
+Формирует письмо “Новая бронь”.
+
+Отправляет арендатору и владельцу объявления (если email есть).
+
+_recipients_with_admin_copy(booking)
+
+получатели: tenant + owner
+
+плюс копия на EMAIL_HOST_USER (тебе как админу)
+
+удаляет дубликаты
+
+send_booking_approved_email(booking_id)
+
+письмо “Бронь подтверждена”, отправляет через _recipients_with_admin_copy
+
+send_booking_canceled_email(booking_id, canceled_by_user_id)
+
+определяет, кто отменил (tenant или owner)
+
+письмо “Бронь отменена …”
+
+отправляет через _recipients_with_admin_copy
+
+6) urls.py
+
+DRF router регистрирует BookingViewSet по пути:
+
+/bookings/
+
+/bookings/{id}/
+
+кастомные actions:
+
+/bookings/{id}/cancel/
+
+/bookings/{id}/approve/
+
+/bookings/{id}/reject/
+
+7) views.py (BookingViewSet)
+
+ModelViewSet даёт CRUD, но логика ограничена ролями.
+
+queryset: select_related("listing", "tenant", "decided_by") — оптимизация.
+
+get_serializer_class():
+
+на create используется BookingCreateSerializer
+
+иначе BookingSerializer
+
+get_queryset():
+
+пользователь видит только:
+
+свои брони как tenant
+
+и брони по своим объявлениям как owner
+
+Admin (admin.py)
+
+Для модели Booking настроена административная панель Django.
+В списке бронирований отображаются основные поля (объявление, арендатор, даты, статус, дата создания), доступна фильтрация по статусу и дате,
+ а также поиск по названию объявления и email арендатора.
+
+Административные действия, связанные с блокировкой и разблокировкой пользователей, должны быть реализованы в модуле users и не относятся к
+приложению bookings. В текущей версии проекта данный код требует переноса в apps/users/admin.py.

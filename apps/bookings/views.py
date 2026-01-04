@@ -8,8 +8,7 @@ from .models import Booking
 from .permissions import IsTenant, IsListingOwner
 from .serializers import BookingCreateSerializer, BookingSerializer
 
-from .tasks import send_booking_created_email
-from .tasks import send_booking_created_email, send_booking_approved_email, send_booking_canceled_email
+from .tasks import send_booking_created_email, send_booking_canceled_email
 
 class BookingViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
@@ -90,5 +89,6 @@ class BookingViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         booking = serializer.save()
         send_booking_created_email.delay(booking.id)
-        send_booking_canceled_email.delay(booking.id, request.user.id)
+
+
 
