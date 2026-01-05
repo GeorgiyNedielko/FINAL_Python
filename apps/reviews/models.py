@@ -27,3 +27,41 @@ class Review(models.Model):
 
     def __str__(self):
         return f"Review #{self.id} listing={self.listing_id} rating={self.rating}"
+
+
+class TenantReview(models.Model):
+    booking = models.OneToOneField(
+        Booking,
+        on_delete=models.CASCADE,
+        related_name="tenant_review"
+    )
+
+
+    tenant = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="received_tenant_reviews"
+    )
+
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="given_tenant_reviews"
+    )
+
+    rating = models.PositiveSmallIntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(5)]
+    )
+    text = models.TextField(blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["tenant", "created_at"]),
+            models.Index(fields=["author", "created_at"]),
+        ]
+
+    def __str__(self):
+        return f"TenantReview #{self.id} tenant={self.tenant_id} rating={self.rating}"

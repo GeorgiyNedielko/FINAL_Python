@@ -10,38 +10,104 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_GET
 
 from rest_framework import viewsets, permissions, status
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from .models import Listing, ListingViewStat
 from .serializers import ListingSerializer
 from .permissions import IsLandlord, IsOwnerOrReadOnly
 from .tasks import track_listing_view, save_listing_view_event
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
 
+
+def _to_int(v):
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def _to_decimal(v):
+    try:
+        return Decimal(v)
+    except (TypeError, ValueError, InvalidOperation):
+        return None
 
 
 class ListingViewSet(viewsets.ModelViewSet):
     serializer_class = ListingSerializer
 
     def get_queryset(self):
-        qs = Listing.objects.filter(is_active=True).annotate(
-            avg_rating=Coalesce(Avg("reviews__rating"), 0.0),
-            reviews_count=Count("reviews", distinct=True),
+        qs = (
+            Listing.objects
+            .filter(is_active=True)
+            .annotate(
+                avg_rating=Coalesce(Avg("reviews__rating"), 0.0),
+                reviews_count=Count("reviews", distinct=True),
+            )
         )
+
 
         subq = (
             ListingViewStat.objects
             .filter(listing_id=OuterRef("pk"))
             .values("views_total")[:1]
         )
-
         qs = qs.annotate(
             _views_total=Coalesce(Subquery(subq, output_field=IntegerField()), Value(0))
         )
 
-        sort = self.request.query_params.get("sort")
+        params = self.request.query_params
+
+        q = params.get("q")
+        if q:
+            qs = qs.filter(
+                Q(title__icontains=q) |
+                Q(description__icontains=q) |
+                Q(city__icontains=q) |
+                Q(country__icontains=q) |
+                Q(street__icontains=q) |
+                Q(postal_code__icontains=q)
+            )
+
+        city = params.get("city")
+        if city:
+            qs = qs.filter(city__icontains=city)
+
+        country = params.get("country")
+        if country:
+            qs = qs.filter(country__icontains=country)
+
+        district = params.get("district")
+        if district:
+            qs = qs.filter(Q(street__icontains=district) | Q(postal_code__icontains=district))
+
+        housing_type = params.get("housing_type")
+        if housing_type:
+            qs = qs.filter(housing_type=housing_type)
+
+        rooms_min = _to_int(params.get("rooms_min"))
+        if rooms_min is not None:
+            qs = qs.filter(rooms__gte=rooms_min)
+
+        rooms_max = _to_int(params.get("rooms_max"))
+        if rooms_max is not None:
+            qs = qs.filter(rooms__lte=rooms_max)
+
+        currency = params.get("currency")
+        if currency:
+            qs = qs.filter(currency=currency)
+
+        price_min = _to_decimal(params.get("price_min"))
+        if price_min is not None:
+            qs = qs.filter(price__gte=price_min)
+
+        price_max = _to_decimal(params.get("price_max"))
+        if price_max is not None:
+            qs = qs.filter(price__lte=price_max)
+
+        sort = params.get("sort", "date_new")
+
         if sort == "rating_desc":
             qs = qs.order_by("-avg_rating", "-reviews_count", "-created_at")
         elif sort == "rating_asc":
@@ -50,6 +116,12 @@ class ListingViewSet(viewsets.ModelViewSet):
             qs = qs.order_by("-_views_total", "-created_at")
         elif sort == "reviews_desc":
             qs = qs.order_by("-reviews_count", "-avg_rating", "-created_at")
+        elif sort == "price_asc":
+            qs = qs.order_by("price", "-created_at")
+        elif sort == "price_desc":
+            qs = qs.order_by("-price", "-created_at")
+        elif sort == "date_old":
+            qs = qs.order_by("created_at")
         else:
             qs = qs.order_by("-created_at")
 
@@ -127,22 +199,9 @@ class ListingViewSet(viewsets.ModelViewSet):
         return Response(self.get_serializer(ordered, many=True).data)
 
 
-def _to_int(v):
-    try:
-        return int(v)
-    except (TypeError, ValueError):
-        return None
-
-
-def _to_decimal(v):
-    try:
-        return Decimal(v)
-    except (TypeError, ValueError, InvalidOperation):
-        return None
-
-
 @require_GET
 def listings_search(request):
+
     qs = Listing.objects.filter(is_active=True).annotate(
         avg_rating=Coalesce(Avg("reviews__rating"), 0.0),
         reviews_count=Count("reviews", distinct=True),
@@ -262,6 +321,7 @@ def listings_search(request):
         "warnings": warnings,
         "results": results,
     }, json_dumps_params={"ensure_ascii": False})
+
 
 @api_view(["GET"])
 @permission_classes([AllowAny])

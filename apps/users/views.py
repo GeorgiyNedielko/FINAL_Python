@@ -84,3 +84,5 @@ class UserBlockAPIView(APIView):
             {"status": "unblocked", "user_id": user.id},
             status=status.HTTP_200_OK,
         )
+
+

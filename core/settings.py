@@ -190,7 +190,7 @@ MAPS_SEARCH_URL = os.getenv(
 
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=360),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
 }
 

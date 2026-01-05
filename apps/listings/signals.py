@@ -71,7 +71,7 @@ def notify_admin_on_create_and_duplicates(sender, instance: Listing, created: bo
             transaction.on_commit(
                 lambda: delete_listing_if_still_duplicate.apply_async(
                     args=[instance.id],
-                    countdown=300,  # 1 час = много
+                    countdown=120,
                 )
             )
 
