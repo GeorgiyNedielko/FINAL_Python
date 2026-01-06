@@ -1,8 +1,25 @@
+from __future__ import annotations
+
 from celery import shared_task
 from django.conf import settings
 from django.core.mail import send_mail
 
 from .models import Booking
+
+
+def _from_email() -> str | None:
+    return getattr(settings, "DEFAULT_FROM_EMAIL", None) or getattr(settings, "EMAIL_HOST_USER", None)
+
+
+def _recipients_with_admin_copy(booking: Booking) -> list[str]:
+    recipients = [booking.tenant.email, booking.listing.owner.email]
+    recipients = [x for x in recipients if x]
+
+    admin_copy = getattr(settings, "EMAIL_HOST_USER", None)
+    if admin_copy:
+        recipients.append(admin_copy)
+
+    return list(dict.fromkeys(recipients))
 
 
 @shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=5)
@@ -14,7 +31,6 @@ def send_booking_created_email(self, booking_id: int):
     )
 
     subject = f"Новая бронь (ID {booking.id})"
-
     msg = (
         f"Создана новая бронь.\n\n"
         f"Объявление: {booking.listing.title}\n"
@@ -24,25 +40,12 @@ def send_booking_created_email(self, booking_id: int):
         f"Статус: {booking.status}\n"
     )
 
-    recipients = [booking.tenant.email, booking.listing.owner.email]
-    recipients = [x for x in recipients if x]
-
+    recipients = _recipients_with_admin_copy(booking)
     if not recipients:
         return {"ok": False, "reason": "no_recipients"}
 
-    send_mail(subject, msg, settings.DEFAULT_FROM_EMAIL, recipients, fail_silently=False)
+    send_mail(subject, msg, _from_email(), recipients, fail_silently=False)
     return {"ok": True, "recipients": recipients}
-
-def _recipients_with_admin_copy(booking: Booking):
-    recipients = [booking.tenant.email, booking.listing.owner.email]
-    recipients = [x for x in recipients if x]
-
-    admin_copy = getattr(settings, "EMAIL_HOST_USER", None)
-    if admin_copy:
-        recipients.append(admin_copy)
-
-    recipients = list(dict.fromkeys(recipients))
-    return recipients
 
 
 @shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=5)
@@ -67,7 +70,7 @@ def send_booking_approved_email(self, booking_id: int):
     if not recipients:
         return {"ok": False, "reason": "no_recipients"}
 
-    send_mail(subject, msg, settings.DEFAULT_FROM_EMAIL, recipients, fail_silently=False)
+    send_mail(subject, msg, _from_email(), recipients, fail_silently=False)
     return {"ok": True, "recipients": recipients}
 
 
@@ -95,5 +98,5 @@ def send_booking_canceled_email(self, booking_id: int, canceled_by_user_id: int)
     if not recipients:
         return {"ok": False, "reason": "no_recipients"}
 
-    send_mail(subject, msg, settings.DEFAULT_FROM_EMAIL, recipients, fail_silently=False)
+    send_mail(subject, msg, _from_email(), recipients, fail_silently=False)
     return {"ok": True, "recipients": recipients}

@@ -68,8 +68,8 @@ class ListingAdmin(admin.ModelAdmin):
             _reviews_count=Count("reviews", distinct=True),
         )
 
-        if hasattr(Listing, "is_deleted"):
-            qs = qs.filter(is_deleted=False)
+        # if hasattr(Listing, "is_deleted"):
+        #     qs = qs.filter(is_deleted=False)
 
         return qs
 

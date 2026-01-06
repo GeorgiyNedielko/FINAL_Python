@@ -20,8 +20,7 @@ class SoftDeleteQuerySet(models.QuerySet):
         return super().delete()
 
     def restore(self):
-        """Восстановление queryset."""
-        return self.filter(is_deleted=True).update(
+         return self.filter(is_deleted=True).update(
             is_deleted=False,
             deleted_at=None,
         )
@@ -36,9 +35,8 @@ class SoftDeleteModel(models.Model):
     is_deleted = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)
 
-    objects = SoftDeleteManager()                 # только живые
-    all_objects = SoftDeleteQuerySet.as_manager() # все (живые + удалённые)
-
+    objects = SoftDeleteManager()
+    all_objects = SoftDeleteQuerySet.as_manager()
     class Meta:
         abstract = True
 
@@ -50,12 +48,10 @@ class SoftDeleteModel(models.Model):
             self.save(update_fields=["is_deleted", "deleted_at"])
 
     def hard_delete(self, using=None, keep_parents=False):
-        """Физическое удаление экземпляра."""
-        return super().delete(using=using, keep_parents=keep_parents)
+         return super().delete(using=using, keep_parents=keep_parents)
 
     def restore(self):
-        """Восстановление экземпляра."""
-        if self.is_deleted:
+         if self.is_deleted:
             self.is_deleted = False
             self.deleted_at = None
             self.save(update_fields=["is_deleted", "deleted_at"])

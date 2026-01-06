@@ -66,3 +66,32 @@ class BookingSerializer(serializers.ModelSerializer):
             "canceled_at",
         )
         read_only_fields = fields
+
+class BookingUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Booking
+        fields = ("date_from", "date_to")
+
+    def validate(self, attrs):
+        instance: Booking = self.instance
+
+        date_from = attrs.get("date_from", instance.date_from)
+        date_to = attrs.get("date_to", instance.date_to)
+
+        if date_from >= date_to:
+            raise serializers.ValidationError("date_to должен быть позже date_from.")
+
+        if instance.status != Booking.Status.PENDING:
+            raise serializers.ValidationError("Менять даты можно только для pending брони.")
+
+        overlap = Booking.objects.filter(
+            listing_id=instance.listing_id,
+            status__in=[Booking.Status.PENDING, Booking.Status.APPROVED],
+            date_from__lt=date_to,
+            date_to__gt=date_from,
+        ).exclude(id=instance.id).exists()
+
+        if overlap:
+            raise serializers.ValidationError("Выбранные даты пересекаются с другим бронированием.")
+
+        return attrs

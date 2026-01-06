@@ -1,4 +1,3 @@
-# apps/listings/views.py
 
 from decimal import Decimal, InvalidOperation
 
@@ -7,12 +6,14 @@ from django.db import transaction
 from django.db.models import Q, OuterRef, Subquery, IntegerField, Value, Avg, Count
 from django.db.models.functions import Coalesce
 from django.http import JsonResponse
+from django.utils.dateparse import parse_date
 from django.views.decorators.http import require_GET
 
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+from rest_framework.exceptions import ValidationError
 
 from .models import Listing, ListingViewStat
 from .serializers import ListingSerializer
@@ -47,7 +48,6 @@ class ListingViewSet(viewsets.ModelViewSet):
             )
         )
 
-
         subq = (
             ListingViewStat.objects
             .filter(listing_id=OuterRef("pk"))
@@ -58,6 +58,24 @@ class ListingViewSet(viewsets.ModelViewSet):
         )
 
         params = self.request.query_params
+
+        date_from = params.get("date_from")
+        date_to = params.get("date_to")
+        if date_from and date_to:
+            df = parse_date(date_from)
+            dt = parse_date(date_to)
+
+            if not df or not dt:
+                raise ValidationError({"date": "date_from и date_to должны быть в формате YYYY-MM-DD"})
+            if df >= dt:
+                raise ValidationError({"date": "date_from должен быть меньше date_to"})
+
+
+            qs = qs.exclude(
+                bookings__date_from__lt=dt,
+                bookings__date_to__gt=df,
+                bookings__status__in=["pending", "approved"],
+            ).distinct()
 
         q = params.get("q")
         if q:
@@ -133,7 +151,7 @@ class ListingViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action == "create":
             return [permissions.IsAuthenticated(), IsLandlord()]
-        if self.action in ("update", "partial_update", "destroy", "copy"):
+        if self.action in ("update", "partial_update", "destroy", "copy", "restore"):
             return [permissions.IsAuthenticated(), IsOwnerOrReadOnly()]
         return [permissions.AllowAny()]
 
@@ -149,6 +167,23 @@ class ListingViewSet(viewsets.ModelViewSet):
             original.save()
 
         return Response(self.get_serializer(original).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["post"], url_path="restore", permission_classes=[permissions.IsAuthenticated])
+    def restore(self, request, pk=None):
+        try:
+            listing = Listing.all_objects.get(pk=pk)
+        except Listing.DoesNotExist:
+            return Response({"detail": "Listing not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        if not (request.user.is_staff or listing.owner_id == request.user.id):
+            return Response({"detail": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
+
+        listing.is_deleted = False
+        listing.deleted_at = None
+        listing.is_active = True
+        listing.save(update_fields=["is_deleted", "deleted_at", "is_active"])
+
+        return Response({"detail": "Listing restored"}, status=status.HTTP_200_OK)
 
     def retrieve(self, request, *args, **kwargs):
         obj = self.get_object()
@@ -201,7 +236,6 @@ class ListingViewSet(viewsets.ModelViewSet):
 
 @require_GET
 def listings_search(request):
-
     qs = Listing.objects.filter(is_active=True).annotate(
         avg_rating=Coalesce(Avg("reviews__rating"), 0.0),
         reviews_count=Count("reviews", distinct=True),

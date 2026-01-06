@@ -1,3 +1,6 @@
+
+import logging
+
 from django.core.mail import mail_admins
 from django.db import transaction
 from django.db.models.signals import post_save
@@ -6,12 +9,13 @@ from django.dispatch import receiver
 from .models import Listing
 from .tasks import delete_listing_if_still_duplicate
 
+logger = logging.getLogger(__name__)
+
 
 def _duplicates(instance: Listing):
+
     criteria = dict(
         owner_id=instance.owner_id,
-        title=instance.title,
-        description=instance.description,
         country=instance.country,
         city=instance.city,
         postal_code=instance.postal_code,
@@ -25,14 +29,10 @@ def _duplicates(instance: Listing):
         housing_type=instance.housing_type,
         parking_type=instance.parking_type,
         is_active=instance.is_active,
+        is_deleted=False,
     )
 
-    qs = Listing.all_objects.filter(**criteria).exclude(pk=instance.pk)
-
-    if hasattr(Listing, "is_deleted"):
-        qs = qs.filter(is_deleted=False)
-
-    return qs
+    return Listing.all_objects.filter(**criteria).exclude(pk=instance.pk)
 
 
 @receiver(post_save, sender=Listing)
@@ -50,7 +50,6 @@ def notify_admin_on_create_and_duplicates(sender, instance: Listing, created: bo
             f"Rooms: {instance.rooms}\n"
             f"Active: {instance.is_active}\n"
         )
-
         _safe_mail_admins(subject, message)
 
     dup_ids = list(_duplicates(instance).values_list("id", flat=True)[:10])
@@ -71,19 +70,13 @@ def notify_admin_on_create_and_duplicates(sender, instance: Listing, created: bo
             transaction.on_commit(
                 lambda: delete_listing_if_still_duplicate.apply_async(
                     args=[instance.id],
-                    countdown=120,
+                    countdown=60,
                 )
             )
 
 
 def _safe_mail_admins(subject: str, message: str):
-
     try:
-        mail_admins(
-            subject=subject,
-            message=message,
-            fail_silently=False,
-        )
+        mail_admins(subject=subject, message=message, fail_silently=False)
     except Exception:
-
-        pass
+        logger.exception("mail_admins failed")

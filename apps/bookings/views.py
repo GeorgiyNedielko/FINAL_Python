@@ -9,6 +9,8 @@ from .permissions import IsTenant, IsListingOwner
 from .serializers import BookingCreateSerializer, BookingSerializer
 
 from .tasks import send_booking_created_email, send_booking_canceled_email
+from .serializers import BookingCreateSerializer, BookingSerializer, BookingUpdateSerializer
+
 
 class BookingViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
@@ -17,6 +19,8 @@ class BookingViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         if self.action == "create":
             return BookingCreateSerializer
+        if self.action in ("update", "partial_update"):
+            return BookingUpdateSerializer
         return BookingSerializer
 
     def get_queryset(self):
@@ -86,9 +90,13 @@ class BookingViewSet(viewsets.ModelViewSet):
         booking.save(update_fields=["status", "decided_at", "decided_by", "updated_at"])
         return Response({"detail": "Отклонено."})
 
+    # def perform_create(self, serializer):
+    #     booking = serializer.save()
+    #     try:
+    #         send_booking_created_email.delay(booking.id)
+    #     except Exception:
+    #         send_booking_created_email(booking.id)
+
     def perform_create(self, serializer):
         booking = serializer.save()
-        send_booking_created_email.delay(booking.id)
-
-
-
+        send_booking_created_email(booking.id)
