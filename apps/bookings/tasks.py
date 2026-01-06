@@ -37,12 +37,10 @@ def _recipients_with_admin_copy(booking: Booking):
     recipients = [booking.tenant.email, booking.listing.owner.email]
     recipients = [x for x in recipients if x]
 
-    # копия тебе (чтобы видеть письма даже для test.com)
     admin_copy = getattr(settings, "EMAIL_HOST_USER", None)
     if admin_copy:
         recipients.append(admin_copy)
 
-    # remove duplicates
     recipients = list(dict.fromkeys(recipients))
     return recipients
 
