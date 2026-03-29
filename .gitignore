@@ -24,4 +24,3 @@ celerybeat-schedule-shm
 celerybeat-schedule-wal
 
 *.docx
-*.txt

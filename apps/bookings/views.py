@@ -6,10 +6,12 @@ from rest_framework.response import Response
 
 from .models import Booking
 from .permissions import IsTenant, IsListingOwner
-from .serializers import BookingCreateSerializer, BookingSerializer
-
-from .tasks import send_booking_created_email, send_booking_canceled_email
-from .serializers import BookingCreateSerializer, BookingSerializer, BookingUpdateSerializer
+from .serializers import (
+    BookingCreateSerializer,
+    BookingSerializer,
+    BookingUpdateSerializer,
+)
+from .tasks import send_booking_created_email
 
 
 class BookingViewSet(viewsets.ModelViewSet):
@@ -90,13 +92,9 @@ class BookingViewSet(viewsets.ModelViewSet):
         booking.save(update_fields=["status", "decided_at", "decided_by", "updated_at"])
         return Response({"detail": "Отклонено."})
 
-    # def perform_create(self, serializer):
-    #     booking = serializer.save()
-    #     try:
-    #         send_booking_created_email.delay(booking.id)
-    #     except Exception:
-    #         send_booking_created_email(booking.id)
-
     def perform_create(self, serializer):
         booking = serializer.save()
-        send_booking_created_email(booking.id)
+        try:
+            send_booking_created_email.delay(booking.id)
+        except Exception:
+            send_booking_created_email.run(booking.id)

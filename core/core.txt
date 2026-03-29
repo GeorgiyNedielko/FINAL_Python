@@ -1,0 +1,186 @@
+1) asgi.py
+
+Назначение: входная точка для ASGI-сервера (WebSockets/async-приложения, deployment на ASGI).
+
+Что делает:
+
+выставляет переменную окружения DJANGO_SETTINGS_MODULE = core.settings
+
+создаёт ASGI application через get_asgi_application()
+
+На что влияет в проекте:
+На локальной разработке обычно не трогаешь. Нужен для деплоя и ASGI-инфраструктуры.
+
+2) wsgi.py
+
+Назначение: входная точка для WSGI-сервера (классический деплой: gunicorn/uwsgi).
+
+Что делает:
+
+аналогично выставляет DJANGO_SETTINGS_MODULE
+
+создаёт WSGI application
+
+На что влияет:
+Продакшен/деплой. В логике проекта не участвует.
+
+3) celery.py
+
+Назначение: точка инициализации Celery в проекте.
+
+Что делает:
+
+выставляет DJANGO_SETTINGS_MODULE
+
+создаёт Celery("core")
+
+читает настройки из Django settings с префиксом CELERY_
+
+делает autodiscover_tasks() — Celery сам ищет tasks.py во всех приложениях из INSTALLED_APPS
+
+Ключевой смысл:
+Если Celery не стартует/не видит задачи — первым делом проверяют этот файл + импорт Celery в __init__.py проекта (если он есть) или команду запуска.
+
+4) settings.py
+
+Назначение: центральная конфигурация Django проекта: базы, приложения, DRF, JWT, Redis, Celery, почта.
+
+Важные блоки (по твоему проекту)
+A) Celery Beat Schedule
+
+Ты настроил периодическую задачу:
+
+имя: flush-listing-views-every-minute
+
+task: apps.listings.tasks.flush_listing_views_to_db
+
+расписание: каждую минуту
+
+Смысл:
+Это именно та часть, которая должна регулярно “сливать” просмотры из Redis в БД.
+
+⚠️ Важно: если beat не запущен — задача не будет выполняться вообще.
+
+B) INSTALLED_APPS
+
+Подключены:
+
+apps.users, apps.listings, apps.bookings, apps.reviews
+
+DRF, admin, rangefilter
+
+Смысл:
+Это гарантирует:
+
+миграции видят модели
+
+celery autodiscover увидит tasks.py в этих приложениях
+
+Django admin видит модели
+
+C) AUTH_USER_MODEL = "users.User"
+
+Проект использует кастомного пользователя из apps.users.
+
+Смысл:
+Все связи должны ссылаться на settings.AUTH_USER_MODEL, иначе будут проблемы с миграциями/импортами.
+
+D) REST_FRAMEWORK
+
+Настроены:
+
+пагинация
+
+JWTAuthentication как дефолтная аутентификация
+
+Смысл:
+Все защищённые эндпоинты ждут JWT токен.
+
+E) База данных MySQL
+
+Подключение через env:
+
+host по умолчанию 127.0.0.1
+
+port 33066
+
+db rent_db
+
+Смысл:
+Если проект в Docker, важно чтобы DB_HOST указывал на сервис базы (например db), иначе локально всё будет работать, а в контейнере — нет.
+
+F) Почта (Gmail SMTP)
+
+Настроено через env.
+
+Смысл:
+Система потенциально умеет отправлять письма (уведомления), но критично для тестов только если ты реально шлёшь email.
+
+G) Redis / Cache / Celery
+
+У тебя три Redis-настройки:
+
+CELERY_BROKER_URL = redis://127.0.0.1:6379/0
+
+CELERY_RESULT_BACKEND = redis://127.0.0.1:6379/0
+
+CACHES default → redis://127.0.0.1:6379/1
+
+REDIS_URL = redis://127.0.0.1:6379/0
+
+Смысл:
+
+DB0 используется для Celery и (судя по REDIS_URL) для просмотров тоже
+
+DB1 — Django cache
+
+⚠️ Это важно при проверке “почему ключи пропали”:
+
+ты мог смотреть в DB0, а писать в DB1 (или наоборот)
+
+redis-cli по умолчанию может быть в DB0, а cache — в DB1
+
+H) TIME_ZONE = 'UTC' и CELERY_TIMEZONE = 'UTC'
+
+Смысл:
+Все расписания beat и даты будут идти в UTC. Если ты тестируешь в Германии, время может казаться “сдвинутым”.
+
+5) urls.py
+
+Назначение: маршрутизация всего проекта.
+
+Что подключено:
+
+admin/
+
+api/auth/ → apps.users.urls
+
+api/ → listings, bookings, users, reviews
+
+⚠️ Важный момент: у тебя users.urls подключён дважды:
+
+path("api/auth/", include("apps.users.urls"))
+
+path("api/", include("apps.users.urls"))
+
+Смысл/риск:
+
+одни и те же эндпоинты становятся доступными по двум путям (например /api/auth/login/ и /api/login/)
+
+это может путать Postman/тесты и документацию
+
+при совпадении путей может быть неожиданное поведение
+
+Итог по core
+
+core у тебя отвечает за:
+
+запуск Django (ASGI/WSGI)
+
+конфиг проекта (DRF/JWT)
+
+конфиг Redis/Celery
+
+расписание задачи flush просмотров каждую минуту
+
+подключение всех API роутов
