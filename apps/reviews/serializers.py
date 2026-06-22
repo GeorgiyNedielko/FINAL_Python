@@ -54,7 +54,7 @@ class ReviewCreateSerializer(serializers.ModelSerializer):
             )
 
         status_value = getattr(booking, "status", None)
-        if status_value not in ("confirmed", "approved"):
+        if status_value not in (Booking.Status.APPROVED, Booking.Status.COMPLETED):
             raise serializers.ValidationError(
                 "Отзыв можно оставить только по подтверждённой брони."
             )
@@ -126,7 +126,7 @@ class TenantReviewCreateSerializer(serializers.ModelSerializer):
 
 
         status_value = getattr(booking, "status", None)
-        if status_value not in ("approved", "canceled"):
+        if status_value not in (Booking.Status.APPROVED, Booking.Status.COMPLETED):
             raise serializers.ValidationError("Отзыв о тенанте можно оставить только после завершения брони.")
 
 

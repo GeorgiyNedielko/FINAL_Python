@@ -68,5 +68,32 @@ services:
       db:
         condition: service_healthy
 
+  web:
+    build: .
+    container_name: rent-web
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/app/docker/entrypoint.sh"]
+    command: gunicorn core.wsgi:application --bind 0.0.0.0:8000 --workers 3
+    env_file:
+      - .env
+    environment:
+      DB_HOST: db
+      DB_PORT: "3306"
+      REDIS_URL: redis://redis:6379/0
+      CACHE_REDIS_URL: redis://redis:6379/1
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      SERVE_MEDIA: "1"
+    ports:
+      - "8000:8000"
+    volumes:
+      - media_data:/app/media
+    depends_on:
+      redis:
+        condition: service_started
+      db:
+        condition: service_healthy
+
 volumes:
   mysql_data:
+  media_data:

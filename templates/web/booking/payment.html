@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}Оплата бронирования{% endblock %}
+
+{% block content %}
+<div class="container auth-card" style="max-width:520px">
+  <h1>Оплата</h1>
+  <p style="margin:16px 0">{{ booking.listing.title }}</p>
+  <p>{{ booking.date_from|date:"d.m.Y" }} — {{ booking.date_to|date:"d.m.Y" }}</p>
+  <p class="price-big" style="margin:20px 0">{{ payment.amount }} {{ booking.listing.currency }}</p>
+
+  {% if stripe_enabled %}
+  <p style="color:#6b7280;font-size:.9rem;margin-bottom:24px">
+    Оплата через <strong>Stripe</strong> — безопасный платёж картой. Вы будете перенаправлены на страницу Stripe Checkout.
+  </p>
+  <form method="post">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-accent" style="width:100%">
+      Оплатить {{ payment.amount }} {{ booking.listing.currency }} через Stripe
+    </button>
+  </form>
+  {% else %}
+  <p style="color:#6b7280;font-size:.9rem;margin-bottom:24px">
+    <strong>Демо-режим:</strong> Stripe не настроен (<code>STRIPE_SECRET_KEY</code> в .env).
+    Нажмите кнопку для имитации успешной оплаты.
+  </p>
+  <form method="post">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-accent" style="width:100%">Оплатить (демо)</button>
+  </form>
+  {% endif %}
+
+  <a href="{% url 'web:booking_detail' booking.pk %}" class="btn btn-outline" style="width:100%;margin-top:12px;text-align:center">Назад</a>
+</div>
+{% endblock %}

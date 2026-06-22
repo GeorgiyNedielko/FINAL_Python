@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block title %}Профиль{% endblock %}
+
+{% block content %}
+<div class="container auth-card" style="max-width:560px">
+  <h1>Профиль</h1>
+  <p><strong>Email:</strong> {{ user_obj.email }}</p>
+  <p><strong>Имя:</strong> {{ user_obj.username }}</p>
+  <p><strong>Роль:</strong> {{ user_obj.get_role_display }}</p>
+  <p><strong>Дата регистрации:</strong> {{ user_obj.date_joined|date:"d.m.Y" }}</p>
+  <div style="margin-top:24px;display:flex;gap:8px;flex-wrap:wrap">
+    <a href="{% url 'web:my_bookings' %}" class="btn btn-outline">Мои брони</a>
+    <a href="{% url 'web:favorites' %}" class="btn btn-outline">Избранное</a>
+    {% if user_obj.role == 'landlord' %}
+      <a href="{% url 'web:my_listings' %}" class="btn btn-primary">Мои объявления</a>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

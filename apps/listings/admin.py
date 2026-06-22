@@ -7,7 +7,7 @@ from django.utils.html import format_html
 
 from rangefilter.filters import DateTimeRangeFilter
 
-from .models import Listing, ListingViewStat
+from .models import Listing, ListingViewStat, Amenity, ListingImage, Favorite
 
 from django.db.models import OuterRef, Subquery, IntegerField, Value, Avg, Count, FloatField
 
@@ -125,4 +125,24 @@ class ListingViewStatAdmin(admin.ModelAdmin):
 
     ordering = ("-views_total",)
     list_select_related = ("listing",)
+
+
+class ListingImageInline(admin.TabularInline):
+    model = ListingImage
+    extra = 1
+
+
+ListingAdmin.inlines = [ListingImageInline]
+
+
+@admin.register(Amenity)
+class AmenityAdmin(admin.ModelAdmin):
+    list_display = ("name", "icon", "category")
+    search_fields = ("name", "category")
+
+
+@admin.register(Favorite)
+class FavoriteAdmin(admin.ModelAdmin):
+    list_display = ("user", "listing", "created_at")
+    list_select_related = ("user", "listing")
 

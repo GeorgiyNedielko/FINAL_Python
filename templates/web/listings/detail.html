@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}{{ listing.title }}{% endblock %}
+
+{% block content %}
+<div class="container detail-layout">
+  <div class="detail-content">
+  {% with images=listing.images.all %}
+  <div class="gallery">
+    {% if images %}
+      {% for img in images|slice:":3" %}
+        <img src="{{ img.image.url }}" alt="{{ listing.title }}" class="{% if forloop.first %}main-img{% endif %}">
+      {% endfor %}
+    {% else %}
+      <div class="img-placeholder main-img" style="font-size:4rem">🏠</div>
+    {% endif %}
+  </div>
+  {% endwith %}
+
+  <h1>{{ listing.title }}</h1>
+  <p class="address">📍 {{ listing.full_address }} · <a href="{{ maps_url }}" target="_blank" rel="noopener">На карте</a></p>
+
+  <div class="meta" style="display:flex;gap:16px;margin:12px 0;color:#6b7280">
+    <span class="rating">★ {{ listing.avg_rating|floatformat:1 }} ({{ listing.reviews_count }} отзывов)</span>
+    <span>{{ listing.get_housing_type_display }}</span>
+    <span>{{ listing.rooms }} комн.</span>
+    <span>{{ listing.beds }} кроватей</span>
+    <span>{{ listing.bathrooms }} ванн.</span>
+    <span>до {{ listing.max_guests }} гостей</span>
+  </div>
+
+  {% if listing.amenities.exists %}
+  <div class="amenities">
+    {% for a in listing.amenities.all %}
+      <span class="amenity-tag">{{ a.icon }} {{ a.name }}</span>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <h2 style="margin:24px 0 12px">Описание</h2>
+  <p style="white-space:pre-line">{{ listing.description }}</p>
+
+  <h2 style="margin:32px 0 12px">Отзывы</h2>
+  {% for r in reviews %}
+    <div class="review">
+      <div class="stars">{% for i in "12345" %}{% if forloop.counter <= r.rating %}★{% else %}☆{% endif %}{% endfor %}</div>
+      <strong>{{ r.author.email }}</strong> · {{ r.created_at|date:"d.m.Y" }}
+      <p>{{ r.text }}</p>
+    </div>
+  {% empty %}
+    <p class="empty-state" style="padding:16px">Отзывов пока нет.</p>
+  {% endfor %}
+  </div>
+
+  <aside class="booking-panel">
+    <p class="price-big">{{ listing.price }} {{ listing.currency }} <small style="font-size:.6em;font-weight:400">/ ночь</small></p>
+
+    {% if user.is_authenticated %}
+      {% if user.id != listing.owner_id %}
+        <form action="{% url 'web:create_booking' listing.pk %}" method="post">
+          {% csrf_token %}
+          <div class="form-group">
+            <label>Заезд</label>
+            {{ booking_form.date_from }}
+          </div>
+          <div class="form-group">
+            <label>Выезд</label>
+            {{ booking_form.date_to }}
+          </div>
+          <div class="form-group">
+            <label>Гостей</label>
+            {{ booking_form.guests }}
+          </div>
+          <button type="submit" class="btn btn-accent" style="width:100%">Забронировать</button>
+        </form>
+        <form action="{% url 'web:toggle_favorite' listing.pk %}" method="post" style="margin-top:12px">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-outline btn-sm" style="width:100%">
+            {% if is_favorite %}♥ В избранном{% else %}♡ В избранное{% endif %}
+          </button>
+        </form>
+      {% else %}
+        <p>Это ваше объявление.</p>
+        <a href="{% url 'web:listing_edit' listing.pk %}" class="btn btn-primary" style="width:100%">Редактировать</a>
+      {% endif %}
+    {% else %}
+      <p style="margin-bottom:12px">Войдите, чтобы забронировать.</p>
+      <a href="{% url 'web:login' %}?next={{ request.path }}" class="btn btn-accent" style="width:100%;text-align:center">Войти</a>
+    {% endif %}
+  </aside>
+</div>
+{% endblock %}

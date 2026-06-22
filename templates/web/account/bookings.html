@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}Мои бронирования{% endblock %}
+
+{% block content %}
+<div class="container section">
+  <h1 class="section-title">Мои бронирования</h1>
+  <div class="booking-list">
+    {% for b in bookings %}
+    <div class="booking-item">
+      <div>
+        <strong><a href="{% url 'web:listing_detail' b.listing_id %}">{{ b.listing.title }}</a></strong>
+        <p style="color:#6b7280;font-size:.9rem">
+          {{ b.date_from|date:"d.m.Y" }} — {{ b.date_to|date:"d.m.Y" }} · {{ b.guests }} гостей · {{ b.nights }} ночей
+        </p>
+        <p>{{ b.total_price }} {{ b.listing.currency }}</p>
+      </div>
+      <div style="text-align:right">
+        <span class="status status-{{ b.status }}">{{ b.get_status_display }}</span>
+        <p style="margin-top:8px"><a href="{% url 'web:booking_detail' b.pk %}" class="btn btn-sm btn-outline">Подробнее</a></p>
+      </div>
+    </div>
+    {% empty %}
+    <p class="empty-state">Бронирований пока нет. <a href="{% url 'web:search' %}">Найти жильё</a></p>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

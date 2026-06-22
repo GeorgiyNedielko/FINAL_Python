@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Бронирование #{{ booking.id }}{% endblock %}
+
+{% block content %}
+<div class="container section" style="max-width:800px">
+  <h1>Бронирование #{{ booking.id }}</h1>
+  <div style="background:#fff;padding:24px;border-radius:8px;box-shadow:0 2px 16px rgba(0,0,0,.08);margin-top:16px">
+    <h2><a href="{% url 'web:listing_detail' booking.listing_id %}">{{ booking.listing.title }}</a></h2>
+    <p style="margin:12px 0;color:#6b7280">{{ booking.listing.full_address }}</p>
+    <p><strong>Даты:</strong> {{ booking.date_from|date:"d.m.Y" }} — {{ booking.date_to|date:"d.m.Y" }} ({{ booking.nights }} ночей)</p>
+    <p><strong>Гостей:</strong> {{ booking.guests }}</p>
+    <p><strong>Сумма:</strong> {{ booking.total_price }} {{ booking.listing.currency }}</p>
+    <p><strong>Статус:</strong> <span class="status status-{{ booking.status }}">{{ booking.get_status_display }}</span></p>
+    {% if booking.payment %}
+      <p><strong>Оплата:</strong> <span class="status status-{{ booking.payment.status }}">{{ booking.payment.get_status_display }}</span></p>
+    {% endif %}
+
+    <div style="margin-top:24px;display:flex;gap:8px;flex-wrap:wrap">
+      {% if booking.listing.owner_id == user.id and booking.status == 'pending' %}
+        <form method="post" action="{% url 'web:booking_approve' booking.pk %}">{% csrf_token %}<button class="btn btn-success">Подтвердить</button></form>
+        <form method="post" action="{% url 'web:booking_reject' booking.pk %}">{% csrf_token %}<button class="btn btn-danger">Отклонить</button></form>
+      {% endif %}
+      {% if booking.tenant_id == user.id and booking.status == 'approved' %}
+        {% if not booking.payment or booking.payment.status != 'paid' %}
+        <a href="{% url 'web:booking_pay' booking.pk %}" class="btn btn-accent">Оплатить</a>
+        {% endif %}
+      {% endif %}
+      {% if booking.can_cancel %}
+        <form method="post" action="{% url 'web:booking_cancel' booking.pk %}">{% csrf_token %}<button class="btn btn-outline">Отменить</button></form>
+      {% endif %}
+    </div>
+
+    {% if booking.tenant_id == user.id and not review %}
+      {% if booking.status == 'approved' or booking.status == 'completed' %}
+    <hr style="margin:24px 0;border:none;border-top:1px solid #e5e7eb">
+    <h3>Оставить отзыв</h3>
+    <form method="post" action="{% url 'web:create_review' booking.pk %}">
+      {% csrf_token %}
+      {{ review_form.rating }}
+      {{ review_form.text }}
+      <button type="submit" class="btn btn-primary" style="margin-top:12px">Отправить отзыв</button>
+    </form>
+      {% endif %}
+    {% elif review %}
+    <hr style="margin:24px 0">
+    <p>✓ Ваш отзыв отправлен ({{ review.rating }} ★)</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

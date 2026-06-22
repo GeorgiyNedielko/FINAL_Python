@@ -43,8 +43,12 @@ class Listing(SoftDeleteModel):
     price = models.DecimalField(
         max_digits=10,
         decimal_places=2,
-        verbose_name="Цена"
+        verbose_name="Цена за ночь",
     )
+
+    max_guests = models.PositiveSmallIntegerField(default=2, verbose_name="Макс. гостей")
+    beds = models.PositiveSmallIntegerField(default=1, verbose_name="Кроватей")
+    bathrooms = models.PositiveSmallIntegerField(default=1, verbose_name="Ванных")
 
     currency = models.CharField(
         max_length=3,
@@ -68,6 +72,13 @@ class Listing(SoftDeleteModel):
         verbose_name="Парковка",
     )
     is_active = models.BooleanField(default=True, verbose_name="Активно")
+
+    amenities = models.ManyToManyField(
+        "Amenity",
+        blank=True,
+        related_name="listings",
+        verbose_name="Удобства",
+    )
 
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создано")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлено")
@@ -102,6 +113,81 @@ class Listing(SoftDeleteModel):
         if extra and base:
             return f"{base}, " + ", ".join(extra)
         return base or ", ".join(extra) or ""
+
+    def price_for_stay(self, date_from, date_to):
+        from decimal import Decimal
+
+        nights = (date_to - date_from).days
+        if nights < 1:
+            return Decimal("0")
+        return self.price * nights
+
+    @property
+    def primary_image(self):
+        img = self.images.filter(is_primary=True).first()
+        if img:
+            return img
+        return self.images.order_by("order", "id").first()
+
+
+class Amenity(models.Model):
+    name = models.CharField(max_length=100, unique=True, verbose_name="Название")
+    icon = models.CharField(max_length=8, blank=True, default="", verbose_name="Иконка")
+    category = models.CharField(max_length=50, blank=True, default="", verbose_name="Категория")
+
+    class Meta:
+        verbose_name = "Удобство"
+        verbose_name_plural = "Удобства"
+        ordering = ["category", "name"]
+
+    def __str__(self):
+        return self.name
+
+
+class ListingImage(models.Model):
+    listing = models.ForeignKey(
+        Listing,
+        on_delete=models.CASCADE,
+        related_name="images",
+        verbose_name="Объявление",
+    )
+    image = models.ImageField(upload_to="listings/%Y/%m/", verbose_name="Фото")
+    is_primary = models.BooleanField(default=False, verbose_name="Главное")
+    order = models.PositiveSmallIntegerField(default=0, verbose_name="Порядок")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Фото объявления"
+        verbose_name_plural = "Фото объявлений"
+        ordering = ["order", "id"]
+
+    def __str__(self):
+        return f"Фото #{self.id} — {self.listing_id}"
+
+
+class Favorite(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="favorites",
+    )
+    listing = models.ForeignKey(
+        Listing,
+        on_delete=models.CASCADE,
+        related_name="favorited_by",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Избранное"
+        verbose_name_plural = "Избранное"
+        constraints = [
+            models.UniqueConstraint(fields=["user", "listing"], name="unique_user_listing_favorite"),
+        ]
+
+    def __str__(self):
+        return f"{self.user_id} → {self.listing_id}"
+
 
 class ListingViewStat(models.Model):
     listing = models.OneToOneField(

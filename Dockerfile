@@ -10,5 +10,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Default is overridden by docker-compose (worker / beat).
-CMD ["celery", "-A", "core", "worker", "-l", "info"]
+RUN chmod +x /app/docker/entrypoint.sh
+
+CMD ["gunicorn", "core.wsgi:application", "--bind", "0.0.0.0:8000"]

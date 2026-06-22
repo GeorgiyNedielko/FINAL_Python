@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}Избранное{% endblock %}
+
+{% block content %}
+<div class="container section">
+  <h1 class="section-title">Избранное</h1>
+  <div class="grid">
+    {% for listing in listings %}
+      {% include "web/partials/listing_card.html" with listing=listing %}
+    {% empty %}
+    <p class="empty-state">Список пуст. <a href="{% url 'web:search' %}">Искать жильё</a></p>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

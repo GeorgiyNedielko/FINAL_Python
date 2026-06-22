@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}Мои объявления{% endblock %}
+
+{% block content %}
+<div class="container section">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+    <h1 class="section-title" style="margin:0">Мои объявления</h1>
+    <a href="{% url 'web:listing_create' %}" class="btn btn-accent">+ Новое объявление</a>
+  </div>
+  <div class="grid">
+    {% for listing in listings %}
+      {% include "web/partials/listing_card.html" with listing=listing %}
+    {% empty %}
+    <p class="empty-state">Объявлений нет. <a href="{% url 'web:listing_create' %}">Создать первое</a></p>
+    {% endfor %}
+  </div>
+  {% if listings %}
+  <p style="margin-top:16px;color:#6b7280;font-size:.9rem">Редактирование и снятие — на странице объявления (для владельца).</p>
+  {% endif %}
+</div>
+{% endblock %}

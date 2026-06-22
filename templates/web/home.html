@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<section class="hero">
+  <div class="container">
+    <h1>Найдите идеальное жильё</h1>
+    <p>Квартиры, дома и комнаты — бронируйте с уверенностью</p>
+    <form class="search-box" action="{% url 'web:search' %}" method="get">
+      <div class="form-group">
+        <label>Куда?</label>
+        {{ search_form.q }}
+      </div>
+      <div class="form-group">
+        <label>Заезд</label>
+        {{ search_form.check_in }}
+      </div>
+      <div class="form-group">
+        <label>Выезд</label>
+        {{ search_form.check_out }}
+      </div>
+      <div class="form-group">
+        <label>Гости</label>
+        {{ search_form.guests }}
+      </div>
+      <button type="submit" class="btn btn-accent">Найти</button>
+    </form>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <h2 class="section-title">Популярные направления</h2>
+    <div class="grid">
+      {% for listing in popular_listings %}
+        {% include "web/partials/listing_card.html" with listing=listing %}
+      {% empty %}
+        <p class="empty-state">Пока нет объявлений. <a href="{% url 'web:register' %}">Зарегистрируйтесь</a> как арендодатель.</p>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+{% if amenities %}
+<section class="section" style="background:#fff">
+  <div class="container">
+    <h2 class="section-title">Удобства</h2>
+    <div class="amenities">
+      {% for a in amenities %}
+        <span class="amenity-tag">{{ a.icon }} {{ a.name }}</span>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

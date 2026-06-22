@@ -7,7 +7,7 @@ from .models import Booking
 class BookingCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Booking
-        fields = ("id", "listing", "date_from", "date_to", "status", "created_at")
+        fields = ("id", "listing", "date_from", "date_to", "guests", "status", "created_at")
         read_only_fields = ("id", "status", "created_at")
 
     def validate(self, attrs):
@@ -41,7 +41,10 @@ class BookingCreateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         user = self.context["request"].user
-        return Booking.objects.create(tenant=user, **validated_data)
+        booking = Booking.objects.create(tenant=user, **validated_data)
+        booking.recalculate_total()
+        booking.save(update_fields=["total_price"])
+        return booking
 
 
 class BookingSerializer(serializers.ModelSerializer):
@@ -58,6 +61,8 @@ class BookingSerializer(serializers.ModelSerializer):
             "tenant",
             "date_from",
             "date_to",
+            "guests",
+            "total_price",
             "status",
             "created_at",
             "updated_at",

@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}Поиск жилья{% endblock %}
+
+{% block content %}
+<div class="container search-layout">
+  <aside class="filters">
+    <h3 style="margin-bottom:16px">Фильтры</h3>
+    <form method="get">
+      <div class="form-group">
+        <label>Город / запрос</label>
+        <input type="text" name="q" value="{{ request.GET.q }}" class="form-control">
+      </div>
+      <div class="form-group">
+        <label>Заезд</label>
+        <input type="date" name="check_in" value="{{ request.GET.check_in }}" class="form-control">
+      </div>
+      <div class="form-group">
+        <label>Выезд</label>
+        <input type="date" name="check_out" value="{{ request.GET.check_out }}" class="form-control">
+      </div>
+      <div class="form-group">
+        <label>Гостей</label>
+        <input type="number" name="guests" min="1" value="{{ request.GET.guests|default:2 }}" class="form-control">
+      </div>
+      <div class="form-group">
+        <label>Тип жилья</label>
+        <select name="housing_type" class="form-control">
+          <option value="">Любой</option>
+          {% for val, label in housing_types %}
+            <option value="{{ val }}" {% if request.GET.housing_type == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Цена от</label>
+        <input type="number" name="price_min" value="{{ request.GET.price_min }}" class="form-control" step="0.01">
+      </div>
+      <div class="form-group">
+        <label>Цена до</label>
+        <input type="number" name="price_max" value="{{ request.GET.price_max }}" class="form-control" step="0.01">
+      </div>
+      <div class="form-group">
+        <label>Сортировка</label>
+        <select name="sort" class="form-control">
+          <option value="popular" {% if request.GET.sort == 'popular' %}selected{% endif %}>Популярные</option>
+          <option value="price_asc" {% if request.GET.sort == 'price_asc' %}selected{% endif %}>Цена ↑</option>
+          <option value="price_desc" {% if request.GET.sort == 'price_desc' %}selected{% endif %}>Цена ↓</option>
+          <option value="rating" {% if request.GET.sort == 'rating' %}selected{% endif %}>Рейтинг</option>
+        </select>
+      </div>
+      {% if amenities %}
+      <div class="form-group">
+        <label>Удобства</label>
+        <ul class="checkbox-list">
+          {% for a in amenities %}
+          <li>
+            <label><input type="checkbox" name="amenities" value="{{ a.id }}"
+              {% if a.id|stringformat:"s" in request.GET.amenities %}checked{% endif %}>
+              {{ a.icon }} {{ a.name }}</label>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+      <button type="submit" class="btn btn-primary" style="width:100%">Применить</button>
+    </form>
+  </aside>
+
+  <div>
+    <h1 class="section-title">{{ page_obj.paginator.count }} вариантов</h1>
+    <div class="grid">
+      {% for listing in listings %}
+        {% include "web/partials/listing_card.html" with listing=listing %}
+      {% empty %}
+        <p class="empty-state">Ничего не найдено. Попробуйте изменить фильтры.</p>
+      {% endfor %}
+    </div>
+
+    {% if is_paginated %}
+    <div class="pagination">
+      {% if page_obj.has_previous %}
+        <a href="?{{ request.GET.urlencode }}&page={{ page_obj.previous_page_number }}">←</a>
+      {% endif %}
+      <span class="current">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+      {% if page_obj.has_next %}
+        <a href="?{{ request.GET.urlencode }}&page={{ page_obj.next_page_number }}">→</a>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

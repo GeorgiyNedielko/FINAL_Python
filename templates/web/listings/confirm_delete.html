@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block title %}Подтверждение удаления{% endblock %}
+
+{% block content %}
+<div class="container auth-card">
+  <h1>Снять с публикации?</h1>
+  <p style="margin:16px 0">{{ listing.title }}</p>
+  <form method="post">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-danger">Да, снять</button>
+    <a href="{% url 'web:my_listings' %}" class="btn btn-outline" style="margin-left:8px">Отмена</a>
+  </form>
+</div>
+{% endblock %}

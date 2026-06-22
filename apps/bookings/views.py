@@ -11,7 +11,11 @@ from .serializers import (
     BookingSerializer,
     BookingUpdateSerializer,
 )
-from .tasks import send_booking_created_email
+from .tasks import (
+    send_booking_approved_email,
+    send_booking_canceled_email,
+    send_booking_created_email,
+)
 
 
 class BookingViewSet(viewsets.ModelViewSet):
@@ -53,6 +57,12 @@ class BookingViewSet(viewsets.ModelViewSet):
 
 
         booking.save(update_fields=["status", "canceled_at", "updated_at"])
+
+        try:
+            send_booking_canceled_email.delay(booking.id, request.user.id)
+        except Exception:
+            send_booking_canceled_email.run(booking.id, request.user.id)
+
         return Response({"detail": "Отменено."})
 
     @action(methods=["post"], detail=True, permission_classes=[IsAuthenticated, IsListingOwner])
@@ -77,6 +87,12 @@ class BookingViewSet(viewsets.ModelViewSet):
         booking.decided_at = timezone.now()
         booking.decided_by = request.user
         booking.save(update_fields=["status", "decided_at", "decided_by", "updated_at"])
+
+        try:
+            send_booking_approved_email.delay(booking.id)
+        except Exception:
+            send_booking_approved_email.run(booking.id)
+
         return Response({"detail": "Подтверждено."})
 
     @action(methods=["post"], detail=True, permission_classes=[IsAuthenticated, IsListingOwner])

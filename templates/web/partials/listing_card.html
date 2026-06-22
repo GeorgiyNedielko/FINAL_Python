@@ -1,0 +1,23 @@
+{% load static %}
+<article class="listing-card">
+  <a href="{% url 'web:listing_detail' listing.pk %}" class="card-link">
+    {% with img=listing.primary_image %}
+      {% if img %}
+        <img src="{{ img.image.url }}" alt="{{ listing.title }}">
+      {% else %}
+        <div class="img-placeholder">🏠</div>
+      {% endif %}
+    {% endwith %}
+    <div class="listing-card-body">
+      <h3>{{ listing.title }}</h3>
+      <p class="location">{{ listing.city }}{% if listing.country %}, {{ listing.country }}{% endif %}</p>
+      <div class="meta">
+        <span class="rating">★ {{ listing.avg_rating|floatformat:1 }}</span>
+        <span>{{ listing.reviews_count }} отзывов</span>
+        <span>{{ listing.rooms }} комн.</span>
+        <span>до {{ listing.max_guests }} гостей</span>
+      </div>
+      <p class="price">{{ listing.price }} {{ listing.currency }} <small>/ ночь</small></p>
+    </div>
+  </a>
+</article>

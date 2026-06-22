@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}Регистрация{% endblock %}
+
+{% block content %}
+<div class="auth-card">
+  <h1>Создать аккаунт</h1>
+  <form method="post">
+    {% csrf_token %}
+    {% for field in form %}
+      <div class="form-group">
+        <label>{{ field.label }}</label>
+        {{ field }}
+        {% if field.errors %}<p style="color:#d4111e;font-size:.85rem">{{ field.errors.0 }}</p>{% endif %}
+      </div>
+    {% endfor %}
+    <button type="submit" class="btn btn-accent" style="width:100%">Зарегистрироваться</button>
+  </form>
+  <p style="margin-top:16px;text-align:center">Уже есть аккаунт? <a href="{% url 'web:login' %}">Войти</a></p>
+</div>
+{% endblock %}
