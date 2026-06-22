@@ -3,6 +3,7 @@ from __future__ import annotations
 from celery import shared_task
 from django.conf import settings
 from django.core.mail import send_mail
+from django.utils import timezone
 
 from .models import Booking
 
@@ -14,22 +15,15 @@ def _from_email() -> str | None:
 def _recipients_with_admin_copy(booking: Booking) -> list[str]:
     recipients = [booking.tenant.email, booking.listing.owner.email]
     recipients = [x for x in recipients if x]
-
     admin_copy = getattr(settings, "EMAIL_HOST_USER", None)
     if admin_copy:
         recipients.append(admin_copy)
-
     return list(dict.fromkeys(recipients))
 
 
 @shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=5)
 def send_booking_created_email(self, booking_id: int):
-    booking = (
-        Booking.objects
-        .select_related("tenant", "listing", "listing__owner")
-        .get(id=booking_id)
-    )
-
+    booking = Booking.objects.select_related("tenant", "listing", "listing__owner").get(id=booking_id)
     subject = f"Новая бронь (ID {booking.id})"
     msg = (
         f"Создана новая бронь.\n\n"
@@ -39,23 +33,16 @@ def send_booking_created_email(self, booking_id: int):
         f"Дата выезда: {booking.date_to}\n"
         f"Статус: {booking.status}\n"
     )
-
     recipients = _recipients_with_admin_copy(booking)
     if not recipients:
         return {"ok": False, "reason": "no_recipients"}
-
     send_mail(subject, msg, _from_email(), recipients, fail_silently=False)
     return {"ok": True, "recipients": recipients}
 
 
 @shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=5)
 def send_booking_approved_email(self, booking_id: int):
-    booking = (
-        Booking.objects
-        .select_related("tenant", "listing", "listing__owner", "decided_by")
-        .get(id=booking_id)
-    )
-
+    booking = Booking.objects.select_related("tenant", "listing", "listing__owner", "decided_by").get(id=booking_id)
     subject = f"Бронь подтверждена (ID {booking.id})"
     msg = (
         f"Бронь подтверждена.\n\n"
@@ -63,40 +50,65 @@ def send_booking_approved_email(self, booking_id: int):
         f"Арендатор: {booking.tenant.email}\n"
         f"Дата заезда: {booking.date_from}\n"
         f"Дата выезда: {booking.date_to}\n"
-        f"Статус: {booking.status}\n"
     )
-
     recipients = _recipients_with_admin_copy(booking)
     if not recipients:
         return {"ok": False, "reason": "no_recipients"}
-
     send_mail(subject, msg, _from_email(), recipients, fail_silently=False)
     return {"ok": True, "recipients": recipients}
 
 
 @shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=5)
 def send_booking_canceled_email(self, booking_id: int, canceled_by_user_id: int):
-    booking = (
-        Booking.objects
-        .select_related("tenant", "listing", "listing__owner")
-        .get(id=booking_id)
-    )
-
+    booking = Booking.objects.select_related("tenant", "listing", "listing__owner").get(id=booking_id)
     canceled_by = "арендатором" if booking.tenant_id == canceled_by_user_id else "арендодателем"
-
     subject = f"Бронь отменена (ID {booking.id})"
     msg = (
         f"Бронь отменена {canceled_by}.\n\n"
         f"Объявление: {booking.listing.title}\n"
-        f"Арендатор: {booking.tenant.email}\n"
-        f"Дата заезда: {booking.date_from}\n"
-        f"Дата выезда: {booking.date_to}\n"
-        f"Статус: {booking.status}\n"
+        f"Даты: {booking.date_from} — {booking.date_to}\n"
     )
-
     recipients = _recipients_with_admin_copy(booking)
     if not recipients:
         return {"ok": False, "reason": "no_recipients"}
-
     send_mail(subject, msg, _from_email(), recipients, fail_silently=False)
     return {"ok": True, "recipients": recipients}
+
+
+@shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=5)
+def send_payment_received_email(self, booking_id: int):
+    booking = Booking.objects.select_related("tenant", "listing", "listing__owner").get(id=booking_id)
+    subject = f"Оплата получена (бронь #{booking.id})"
+    msg = (
+        f"Оплата по брони #{booking.id} подтверждена.\n\n"
+        f"Сумма: {booking.total_price} {booking.listing.currency}\n"
+        f"Даты: {booking.date_from} — {booking.date_to}\n"
+    )
+    recipients = _recipients_with_admin_copy(booking)
+    if recipients:
+        send_mail(subject, msg, _from_email(), recipients, fail_silently=False)
+    return {"ok": bool(recipients)}
+
+
+@shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=5)
+def send_booking_completed_email(self, booking_id: int):
+    booking = Booking.objects.select_related("tenant", "listing", "listing__owner").get(id=booking_id)
+    subject = f"Проживание завершено (бронь #{booking.id})"
+    msg = f"Бронь #{booking.id} завершена. Оставьте отзыв о {booking.listing.title}!"
+    if booking.tenant.email:
+        send_mail(subject, msg, _from_email(), [booking.tenant.email], fail_silently=False)
+    return {"ok": True}
+
+
+@shared_task
+def complete_past_bookings():
+    today = timezone.localdate()
+    qs = Booking.objects.filter(status=Booking.Status.APPROVED, date_to__lte=today)
+    ids = list(qs.values_list("id", flat=True))
+    updated = qs.update(status=Booking.Status.COMPLETED)
+    for bid in ids:
+        try:
+            send_booking_completed_email.delay(bid)
+        except Exception:
+            send_booking_completed_email.run(bid)
+    return {"completed": updated}

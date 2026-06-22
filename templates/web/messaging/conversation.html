@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Чат — {{ conversation.listing.title }}{% endblock %}
+{% block content %}
+<div class="container section" style="max-width:720px">
+  <h1>{{ conversation.listing.title }}</h1>
+  <p style="color:#6b7280;margin-bottom:16px">Арендатор: {{ conversation.tenant.email }}</p>
+  <div style="background:#fff;border-radius:8px;padding:16px;min-height:240px;box-shadow:0 2px 16px rgba(0,0,0,.08)">
+    {% for m in chat_messages %}
+    <div style="margin-bottom:12px;{% if m.sender_id == user.id %}text-align:right{% endif %}">
+      <small style="color:#6b7280">{{ m.sender.email }} · {{ m.created_at|date:"d.m H:i" }}</small>
+      <p style="background:{% if m.sender_id == user.id %}#dbeafe{% else %}#f3f4f6{% endif %};padding:8px 12px;border-radius:8px;display:inline-block;margin-top:4px">{{ m.body }}</p>
+    </div>
+    {% empty %}
+    <p class="empty-state">Начните диалог</p>
+    {% endfor %}
+  </div>
+  <form method="post" style="margin-top:16px">{% csrf_token %}{{ form.body }}<button class="btn btn-primary" style="margin-top:8px">Отправить</button></form>
+</div>
+{% endblock %}

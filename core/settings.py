@@ -16,6 +16,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.listings.tasks.flush_listing_views_to_db",
         "schedule": crontab(minute="*/1"),
     },
+    "complete-past-bookings-daily": {
+        "task": "apps.bookings.tasks.complete_past_bookings",
+        "schedule": crontab(hour=3, minute=0),
+    },
 }
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -47,12 +51,15 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "corsheaders",
+    "drf_spectacular",
     "apps.users.apps.UsersConfig",
     "apps.listings.apps.ListingsConfig",
     "rest_framework",
     "rangefilter",
     "apps.bookings.apps.BookingsConfig",
     "apps.reviews.apps.ReviewsConfig",
+    "apps.messaging.apps.MessagingConfig",
     "apps.web.apps.WebConfig",
 ]
 
@@ -64,11 +71,36 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "120/hour",
+        "user": "2000/hour",
+        "auth": "30/hour",
+        "burst": "60/minute",
+    },
 }
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Mieten Rental API",
+    "DESCRIPTION": "API аренды жилья",
+    "VERSION": "1.0.0",
+}
+
+CORS_ALLOWED_ORIGINS = [
+    o.strip()
+    for o in os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",")
+    if o.strip()
+]
+CORS_ALLOW_CREDENTIALS = True
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -113,6 +145,14 @@ DATABASES = {
         "OPTIONS": {"charset": "utf8mb4"},
     }
 }
+
+if os.getenv("USE_SQLITE", "0") == "1":
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
 
 
 AUTH_PASSWORD_VALIDATORS = [
@@ -192,6 +232,18 @@ STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
 STRIPE_PUBLISHABLE_KEY = os.getenv("STRIPE_PUBLISHABLE_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
 
+PLATFORM_FEE_PERCENT = os.getenv("PLATFORM_FEE_PERCENT", "0")
+
+SENTRY_DSN = os.getenv("SENTRY_DSN", "")
+if SENTRY_DSN:
+    import sentry_sdk
+    from sentry_sdk.integrations.django import DjangoIntegration
+
+    sentry_sdk.init(dsn=SENTRY_DSN, integrations=[DjangoIntegration()], traces_sample_rate=0.1)
+
+LISTING_IMAGE_MAX_SIZE_MB = int(os.getenv("LISTING_IMAGE_MAX_SIZE_MB", "5"))
+LISTING_IMAGE_MAX_COUNT = int(os.getenv("LISTING_IMAGE_MAX_COUNT", "10"))
+
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=360),
@@ -219,3 +271,12 @@ if os.getenv("USE_TLS", "0") == "1":
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+
+if os.getenv("USE_SQLITE", "0") == "1":
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        }
+    }
+    CELERY_TASK_ALWAYS_EAGER = True

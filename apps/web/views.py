@@ -23,18 +23,38 @@ from apps.bookings.stripe_service import (
     handle_webhook,
     stripe_enabled,
 )
+from apps.listings.services import (
+    base_listing_queryset,
+    filter_listings,
+    get_booked_date_ranges,
+    similar_listings,
+)
 from apps.bookings.tasks import (
     send_booking_approved_email,
     send_booking_canceled_email,
     send_booking_created_email,
+    send_payment_received_email,
 )
+from apps.reviews.models import Review, TenantReview
 from apps.listings.models import Amenity, Favorite, Listing, ListingImage
 from apps.listings.tasks import save_listing_view_event, track_listing_view
-from apps.reviews.models import Review
 from apps.users.models import User
 
-from .forms import BookingForm, EmailAuthenticationForm, ListingForm, RegisterForm, ReviewForm, SearchForm
-from .services import base_listing_queryset, filter_listings
+from .forms import (
+    BookingForm,
+    EmailAuthenticationForm,
+    ListingForm,
+    RegisterForm,
+    ReviewForm,
+    SearchForm,
+    TenantReviewForm,
+)
+from .utils import (
+    check_login_rate_limit,
+    clear_login_failures,
+    record_login_failure,
+    validate_uploaded_images,
+)
 
 
 class HomeView(TemplateView):
@@ -102,6 +122,12 @@ class ListingDetailView(DetailView):
         ctx["maps_url"] = (
             f"https://www.google.com/maps/search/?api=1&query={listing.full_address()}"
         )
+        if listing.latitude and listing.longitude:
+            ctx["maps_embed_url"] = (
+                f"https://maps.google.com/maps?q={listing.latitude},{listing.longitude}&z=15&output=embed"
+            )
+        ctx["booked_ranges"] = get_booked_date_ranges(listing.pk)
+        ctx["similar_listings"] = similar_listings(listing)
         return ctx
 
 
@@ -128,12 +154,23 @@ class LoginView(View):
         return render(request, self.template_name, {"form": EmailAuthenticationForm()})
 
     def post(self, request):
+        email = request.POST.get("username", "")
+        if not check_login_rate_limit(request, email):
+            messages.error(request, "Слишком много попыток. Подождите 15 минут.")
+            return render(request, self.template_name, {"form": EmailAuthenticationForm()})
+
         form = EmailAuthenticationForm(request, data=request.POST)
         if form.is_valid():
+            clear_login_failures(request, email)
             login(request, form.get_user())
             messages.success(request, "Вы вошли в аккаунт.")
             next_url = request.GET.get("next") or reverse("web:home")
             return redirect(next_url)
+
+        if "заблокирован" in str(form.errors).lower() or "inactive" in str(form.errors).lower():
+            messages.error(request, "Аккаунт заблокирован. Обратитесь в поддержку.")
+        else:
+            record_login_failure(request, email)
         return render(request, self.template_name, {"form": form})
 
 
@@ -142,9 +179,6 @@ class LogoutView(View):
         logout(request)
         messages.info(request, "Вы вышли из аккаунта.")
         return redirect("web:home")
-
-    def get(self, request):
-        return self.post(request)
 
 
 class LandlordRequiredMixin(UserPassesTestMixin):
@@ -169,12 +203,19 @@ class ListingCreateView(LoginRequiredMixin, LandlordRequiredMixin, CreateView):
 
     def _save_images(self):
         files = self.request.FILES.getlist("images")
+        if not files:
+            return
+        try:
+            validate_uploaded_images(files)
+        except Exception as exc:
+            messages.warning(self.request, str(exc))
+            return
         for i, f in enumerate(files):
             ListingImage.objects.create(
                 listing=self.object,
                 image=f,
-                is_primary=(i == 0),
-                order=i,
+                is_primary=(i == 0 and not self.object.images.exists()),
+                order=self.object.images.count() + i,
             )
 
     def get_context_data(self, **kwargs):
@@ -243,7 +284,12 @@ def create_booking(request, pk):
     booking = form.save(commit=False)
     booking.listing = listing
     booking.tenant = request.user
-    booking.status = Booking.Status.PENDING
+    if listing.instant_book:
+        booking.status = Booking.Status.APPROVED
+        booking.decided_at = timezone.now()
+        booking.decided_by = listing.owner
+    else:
+        booking.status = Booking.Status.PENDING
     booking.recalculate_total()
     booking.save()
 
@@ -252,12 +298,18 @@ def create_booking(request, pk):
         defaults={"amount": booking.total_price, "status": Payment.Status.PENDING},
     )
 
-    try:
-        send_booking_created_email.delay(booking.id)
-    except Exception:
-        send_booking_created_email.run(booking.id)
-
-    messages.success(request, "Заявка на бронирование отправлена. Ожидайте подтверждения.")
+    if listing.instant_book:
+        try:
+            send_booking_approved_email.delay(booking.id)
+        except Exception:
+            send_booking_approved_email.run(booking.id)
+        messages.success(request, "Бронирование подтверждено автоматически! Перейдите к оплате.")
+    else:
+        try:
+            send_booking_created_email.delay(booking.id)
+        except Exception:
+            send_booking_created_email.run(booking.id)
+        messages.success(request, "Заявка отправлена. Ожидайте подтверждения хозяина.")
     return redirect("web:booking_detail", pk=booking.pk)
 
 
@@ -282,16 +334,27 @@ def booking_detail(request, pk):
     if booking.tenant_id != request.user.id and booking.listing.owner_id != request.user.id:
         return HttpResponseForbidden("Нет доступа")
 
-    review = getattr(booking, "review", None) if hasattr(booking, "review") else None
     try:
         review = booking.review
     except Review.DoesNotExist:
         review = None
 
+    tenant_review = None
+    try:
+        tenant_review = booking.tenant_review
+    except TenantReview.DoesNotExist:
+        pass
+
     return render(
         request,
         "web/booking/detail.html",
-        {"booking": booking, "review": review, "review_form": ReviewForm()},
+        {
+            "booking": booking,
+            "review": review,
+            "tenant_review": tenant_review,
+            "review_form": ReviewForm(),
+            "tenant_review_form": TenantReviewForm(),
+        },
     )
 
 
@@ -412,6 +475,10 @@ def booking_pay(request, pk):
         payment.paid_at = timezone.now()
         payment.transaction_id = f"MOCK-{booking.id}-{int(timezone.now().timestamp())}"
         payment.save()
+        try:
+            send_payment_received_email.delay(booking.id)
+        except Exception:
+            send_payment_received_email.run(booking.id)
         messages.success(request, "Оплата прошла успешно (демо-режим).")
         return redirect("web:booking_detail", pk=pk)
 
@@ -436,6 +503,10 @@ def booking_pay_success(request, pk):
         try:
             payment = fulfill_checkout_session(session_id)
             if payment and payment.booking_id == booking.id:
+                try:
+                    send_payment_received_email.delay(booking.id)
+                except Exception:
+                    send_payment_received_email.run(booking.id)
                 messages.success(request, "Оплата через Stripe прошла успешно!")
                 return redirect("web:booking_detail", pk=pk)
         except Exception as exc:

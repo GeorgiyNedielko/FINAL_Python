@@ -7,7 +7,7 @@ from django.utils.html import format_html
 
 from rangefilter.filters import DateTimeRangeFilter
 
-from .models import Listing, ListingViewStat, Amenity, ListingImage, Favorite
+from .models import Listing, ListingViewStat, Amenity, ListingImage, Favorite, ListingBlockedDate
 
 from django.db.models import OuterRef, Subquery, IntegerField, Value, Avg, Count, FloatField
 
@@ -132,7 +132,12 @@ class ListingImageInline(admin.TabularInline):
     extra = 1
 
 
-ListingAdmin.inlines = [ListingImageInline]
+class ListingBlockedDateInline(admin.TabularInline):
+    model = ListingBlockedDate
+    extra = 1
+
+
+ListingAdmin.inlines = [ListingImageInline, ListingBlockedDateInline]
 
 
 @admin.register(Amenity)

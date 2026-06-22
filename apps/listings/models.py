@@ -1,7 +1,6 @@
-
-
 from django.conf import settings
 from django.db import models
+from decimal import Decimal
 from apps.common.models import SoftDeleteModel
 
 
@@ -72,6 +71,20 @@ class Listing(SoftDeleteModel):
         verbose_name="Парковка",
     )
     is_active = models.BooleanField(default=True, verbose_name="Активно")
+    instant_book = models.BooleanField(default=False, verbose_name="Мгновенное бронирование")
+    min_nights = models.PositiveSmallIntegerField(default=1, verbose_name="Мин. ночей")
+    platform_fee_percent = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal("0"),
+        verbose_name="Комиссия платформы (%)",
+    )
+    latitude = models.DecimalField(
+        max_digits=9, decimal_places=6, null=True, blank=True, verbose_name="Широта"
+    )
+    longitude = models.DecimalField(
+        max_digits=9, decimal_places=6, null=True, blank=True, verbose_name="Долгота"
+    )
 
     amenities = models.ManyToManyField(
         "Amenity",
@@ -115,12 +128,17 @@ class Listing(SoftDeleteModel):
         return base or ", ".join(extra) or ""
 
     def price_for_stay(self, date_from, date_to):
-        from decimal import Decimal
-
         nights = (date_to - date_from).days
         if nights < 1:
             return Decimal("0")
-        return self.price * nights
+        subtotal = self.price * nights
+        fee_pct = self.platform_fee_percent or Decimal("0")
+        if fee_pct > 0:
+            subtotal += subtotal * fee_pct / Decimal("100")
+        return subtotal.quantize(Decimal("0.01"))
+
+    def is_date_blocked(self, d) -> bool:
+        return self.blocked_dates.filter(date=d).exists()
 
     @property
     def primary_image(self):
@@ -128,6 +146,28 @@ class Listing(SoftDeleteModel):
         if img:
             return img
         return self.images.order_by("order", "id").first()
+
+
+class ListingBlockedDate(models.Model):
+    listing = models.ForeignKey(
+        Listing,
+        on_delete=models.CASCADE,
+        related_name="blocked_dates",
+        verbose_name="Объявление",
+    )
+    date = models.DateField(verbose_name="Дата")
+    reason = models.CharField(max_length=100, blank=True, default="")
+
+    class Meta:
+        verbose_name = "Заблокированная дата"
+        verbose_name_plural = "Заблокированные даты"
+        constraints = [
+            models.UniqueConstraint(fields=["listing", "date"], name="unique_listing_blocked_date"),
+        ]
+        ordering = ["date"]
+
+    def __str__(self):
+        return f"{self.listing_id} — {self.date}"
 
 
 class Amenity(models.Model):

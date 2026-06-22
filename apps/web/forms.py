@@ -6,7 +6,7 @@ from django.utils import timezone
 
 from apps.bookings.models import Booking
 from apps.listings.models import Amenity, Listing, ListingImage
-from apps.reviews.models import Review
+from apps.reviews.models import Review, TenantReview
 
 User = get_user_model()
 
@@ -94,6 +94,11 @@ class ListingForm(forms.ModelForm):
             "housing_type",
             "parking_type",
             "amenities",
+            "instant_book",
+            "min_nights",
+            "platform_fee_percent",
+            "latitude",
+            "longitude",
             "is_active",
         ]
         widgets = {
@@ -114,6 +119,11 @@ class ListingForm(forms.ModelForm):
             "bathrooms": forms.NumberInput(attrs={"class": "form-control"}),
             "housing_type": forms.Select(attrs={"class": "form-control"}),
             "parking_type": forms.Select(attrs={"class": "form-control"}),
+            "instant_book": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "min_nights": forms.NumberInput(attrs={"class": "form-control", "min": 1}),
+            "platform_fee_percent": forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
+            "latitude": forms.NumberInput(attrs={"class": "form-control", "step": "any"}),
+            "longitude": forms.NumberInput(attrs={"class": "form-control", "step": "any"}),
             "amenities": forms.CheckboxSelectMultiple(),
             "is_active": forms.CheckboxInput(attrs={"class": "form-check-input"}),
         }
@@ -147,6 +157,15 @@ class BookingForm(forms.ModelForm):
                 raise ValidationError("Дата выезда должна быть позже даты заезда.")
             if date_from < timezone.localdate():
                 raise ValidationError("Дата заезда не может быть в прошлом.")
+            nights = (date_to - date_from).days
+            if nights < self.listing.min_nights:
+                raise ValidationError(f"Минимальный срок: {self.listing.min_nights} ночей.")
+            from datetime import timedelta
+            d = date_from
+            while d < date_to:
+                if self.listing.is_date_blocked(d):
+                    raise ValidationError(f"Дата {d} недоступна для бронирования.")
+                d += timedelta(days=1)
 
         if guests > self.listing.max_guests:
             raise ValidationError(f"Максимум гостей для этого жилья: {self.listing.max_guests}.")
@@ -174,3 +193,24 @@ class ReviewForm(forms.ModelForm):
             ),
             "text": forms.Textarea(attrs={"class": "form-control", "rows": 4, "placeholder": "Расскажите о проживании..."}),
         }
+
+
+class TenantReviewForm(forms.ModelForm):
+    class Meta:
+        model = TenantReview
+        fields = ("rating", "text")
+        widgets = {
+            "rating": forms.Select(
+                choices=[(i, f"{i} ★") for i in range(5, 0, -1)],
+                attrs={"class": "form-control"},
+            ),
+            "text": forms.Textarea(attrs={"class": "form-control", "rows": 3, "placeholder": "Отзыв о госте..."}),
+        }
+
+
+class MessageForm(forms.Form):
+    body = forms.CharField(
+        label="Сообщение",
+        max_length=2000,
+        widget=forms.Textarea(attrs={"class": "form-control", "rows": 3, "placeholder": "Ваше сообщение..."}),
+    )

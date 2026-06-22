@@ -46,6 +46,21 @@
     <hr style="margin:24px 0">
     <p>✓ Ваш отзыв отправлен ({{ review.rating }} ★)</p>
     {% endif %}
+
+    {% if booking.listing.owner_id == user.id and not tenant_review %}
+      {% if booking.status == 'approved' or booking.status == 'completed' %}
+    <hr style="margin:24px 0">
+    <h3>Отзыв о госте</h3>
+    <form method="post" action="{% url 'web:create_tenant_review' booking.pk %}">
+      {% csrf_token %}
+      {{ tenant_review_form.rating }}
+      {{ tenant_review_form.text }}
+      <button type="submit" class="btn btn-outline" style="margin-top:12px">Отправить</button>
+    </form>
+      {% endif %}
+    {% elif tenant_review %}
+    <p>✓ Отзыв о госте отправлен ({{ tenant_review.rating }} ★)</p>
+    {% endif %}
   </div>
 </div>
 {% endblock %}

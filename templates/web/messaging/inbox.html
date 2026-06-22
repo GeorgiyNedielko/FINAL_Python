@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Сообщения{% endblock %}
+{% block content %}
+<div class="container section">
+  <h1 class="section-title">Сообщения</h1>
+  <div class="booking-list">
+    {% for c in conversations %}
+    <div class="booking-item">
+      <div>
+        <strong>{{ c.listing.title }}</strong>
+        <p style="color:#6b7280;font-size:.9rem">С {{ c.tenant.email }}</p>
+      </div>
+      <a href="{% url 'web:conversation' c.pk %}" class="btn btn-sm btn-outline">Открыть</a>
+    </div>
+    {% empty %}
+    <p class="empty-state">Нет переписок. Напишите хозяину с карточки объявления.</p>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

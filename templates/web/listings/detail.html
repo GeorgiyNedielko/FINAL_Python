@@ -27,6 +27,8 @@
     <span>{{ listing.beds }} кроватей</span>
     <span>{{ listing.bathrooms }} ванн.</span>
     <span>до {{ listing.max_guests }} гостей</span>
+    {% if listing.instant_book %}<span class="amenity-tag">⚡ Мгновенное бронирование</span>{% endif %}
+    <span>мин. {{ listing.min_nights }} ноч.</span>
   </div>
 
   {% if listing.amenities.exists %}
@@ -35,6 +37,20 @@
       <span class="amenity-tag">{{ a.icon }} {{ a.name }}</span>
     {% endfor %}
   </div>
+  {% endif %}
+
+  <h2 style="margin:24px 0 12px">Занятость</h2>
+  <ul style="color:#6b7280;font-size:.9rem">
+    {% for df, dt in booked_ranges %}
+    <li>{{ df|date:"d.m.Y" }} — {{ dt|date:"d.m.Y" }}</li>
+    {% empty %}
+    <li>Нет активных броней на ближайшее время</li>
+    {% endfor %}
+  </ul>
+
+  {% if maps_embed_url %}
+  <h2 style="margin:24px 0 12px">Карта</h2>
+  <iframe src="{{ maps_embed_url }}" width="100%" height="300" style="border:0;border-radius:8px" loading="lazy"></iframe>
   {% endif %}
 
   <h2 style="margin:24px 0 12px">Описание</h2>
@@ -50,6 +66,15 @@
   {% empty %}
     <p class="empty-state" style="padding:16px">Отзывов пока нет.</p>
   {% endfor %}
+
+  {% if similar_listings %}
+  <h2 style="margin:32px 0 12px">Похожие объявления</h2>
+  <div class="grid">
+    {% for item in similar_listings %}
+      {% include "web/partials/listing_card.html" with listing=item %}
+    {% endfor %}
+  </div>
+  {% endif %}
   </div>
 
   <aside class="booking-panel">
@@ -73,6 +98,7 @@
           </div>
           <button type="submit" class="btn btn-accent" style="width:100%">Забронировать</button>
         </form>
+        <a href="{% url 'web:start_chat' listing.pk %}" class="btn btn-outline btn-sm" style="width:100%;margin-top:8px;text-align:center;display:block">Написать хозяину</a>
         <form action="{% url 'web:toggle_favorite' listing.pk %}" method="post" style="margin-top:12px">
           {% csrf_token %}
           <button type="submit" class="btn btn-outline btn-sm" style="width:100%">

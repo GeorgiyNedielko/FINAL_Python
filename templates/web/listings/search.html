@@ -41,6 +41,9 @@
         <input type="number" name="price_max" value="{{ request.GET.price_max }}" class="form-control" step="0.01">
       </div>
       <div class="form-group">
+        <label><input type="checkbox" name="instant_book" value="1" {% if request.GET.instant_book %}checked{% endif %}> Мгновенное бронирование</label>
+      </div>
+      <div class="form-group">
         <label>Сортировка</label>
         <select name="sort" class="form-control">
           <option value="popular" {% if request.GET.sort == 'popular' %}selected{% endif %}>Популярные</option>

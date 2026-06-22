@@ -3,6 +3,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from .jwt import EmailTokenObtainPairSerializer
 from rest_framework import generics, permissions
 from .serializers import RegisterSerializer
+from .throttles import AuthRateThrottle
 from rest_framework import status
 from rest_framework.response import Response
 from .models import UserBlock
@@ -26,10 +27,12 @@ class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = RegisterSerializer
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [AuthRateThrottle]
 
 
 class EmailTokenObtainPairView(TokenObtainPairView):
     serializer_class = EmailTokenObtainPairSerializer
+    throttle_classes = [AuthRateThrottle]
 
 
 class UserAdminViewSet(ReadOnlyModelViewSet):
